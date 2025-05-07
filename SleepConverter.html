@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Sleep Ring Converter | SleepON to SleepHQ</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+    :root {
+      --primary: #ff41a4;
+      --secondary: #1fc8db;
+      --background: #121212;
+      --surface: #1e1e2f;
+      --surface-light: #2a2a3a;
+      --text: #ffffff;
+      --text-secondary: #bdc8f0;
+      --success: #4caf50;
+      --danger: #ff5252;
+      --warning: #ffc107;
+      --header-height: 120px;
+      --glow-radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: linear-gradient(45deg, var(--background), #2d2d42);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      animation: fadeIn 1s ease-out;
+    }
+
+    .logo-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .logo-rings {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin: 1rem auto;
+    }
+
+    .ring {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 3px solid transparent;
+      border-radius: 50%;
+    }
+
+    .ring:nth-child(1) {
+      border-top-color: var(--primary);
+      animation: ringPulse 3s infinite, rotate 8s linear infinite;
+    }
+
+    .ring:nth-child(2) {
+      border-right-color: var(--secondary);
+      animation: ringPulse 3s infinite 0.5s, rotate 6s linear infinite reverse;
+    }
+
+    .ring:nth-child(3) {
+      border-bottom-color: var(--success);
+      animation: ringPulse 3s infinite 1s, rotate 10s linear infinite;
+    }
+
+    .step-number {
+      position: absolute;
+      top: -20px;
+      left: -20px;
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .error-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--danger);
+      color: white;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .heart {
+      color: var(--danger);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes ringPulse {
+      0% { transform: scale(0.8); opacity: 0.3; }
+      50% { transform: scale(1.1); opacity: 0.7; }
+      100% { transform: scale(0.8); opacity: 0.3; }
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .neon-text {
+      font-size: 3.5rem;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      animation: glow 3s infinite alternate;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+
+    .step-container {
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface-light) 100%);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+      animation: fadeIn 0.5s ease-out;
+      transition: all 0.3s ease;
+    }
+
+    .upload-area {
+      background: var(--surface-light);
+      border: 2px dashed var(--text-secondary);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    .upload-area:hover {
+      border-color: var(--secondary);
+      background-color: rgba(31, 200, 219, 0.05);
+    }
+
+    .icon-container {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .upload-icon {
+      font-size: 3rem;
+      color: var(--text-secondary);
+    }
+
+    .file-select-button {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      padding: 0.8rem 1.5rem;
+      border-radius: 50px;
+      display: inline-block;
+      margin-top: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 15px rgba(255, 65, 164, 0.3);
+    }
+
+    .action-button {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-width: 200px;
+      text-decoration: none;
+      box-shadow: 0 5px 15px rgba(255, 65, 164, 0.3);
+    }
+
+    .secondary-button {
+      background: transparent;
+      color: var(--text);
+      border: 2px solid var(--text-secondary);
+      padding: 0.8rem 1.5rem;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 10px;
+      background-color: var(--surface-light);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      transition: width 0.3s ease;
+    }
+
+    .preview-container {
+      width: 100%;
+      background: var(--surface-light);
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    th {
+      background-color: rgba(31, 200, 219, 0.2);
+      text-align: left;
+      padding: 0.8rem;
+      font-weight: 600;
+      border-bottom: 2px solid var(--secondary);
+    }
+
+    td {
+      padding: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stats-container {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .stat-card {
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+      flex: 1;
+      min-width: 150px;
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: var(--secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes glow {
+      0% { filter: drop-shadow(0 0 var(--glow-radius) rgba(255, 65, 164, 0.7)); }
+      50% { filter: drop-shadow(0 0 calc(var(--glow-radius) * 1.5) rgba(31, 200, 219, 0.9)); }
+      100% { filter: drop-shadow(0 0 var(--glow-radius) rgba(255, 65, 164, 0.7)); }
+    }
+
+    @media (max-width: 768px) {
+      .container { padding: 1rem; }
+      .neon-text { font-size: 2.5rem; }
+      .step-container { padding: 1.5rem; }
+      .upload-area { padding: 2rem 1rem; }
+      .stat-card { min-width: 120px; }
+    }
+    </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <h1 class="neon-text">Sleep Ring Converter</h1>
+        <div class="logo-rings">
+          <span class="ring"></span>
+          <span class="ring"></span>
+          <span class="ring"></span>
+        </div>
+      </div>
+      <p class="subtitle">Transform SleepON 3 ring data to SleepHQ format instantly</p>
+    </header>
+
+    <main>
+      <section class="step-container" id="step1">
+        <div class="step-number">1</div>
+        <h2>Upload Your SleepON 3 File</h2>
+        <div class="upload-area" id="dropZone">
+          <div class="icon-container">
+            <i class="fas fa-file-csv upload-icon"></i>
+            <i class="fas fa-file-excel upload-icon"></i>
+          </div>
+          <p>Drop your SleepON CSV or Excel (.xlsx) file here</p>
+          <p class="small">or</p>
+          <div class="file-select-button" id="selectFileButton">Select File</div>
+          <input type="file" id="fileInput" accept=".csv,.xlsx" style="display:none;">
+          <p id="fileInfo"></p>
+        </div>
+      </section>
+
+      <section class="step-container hidden" id="step2">
+        <h2>Convert & Preview</h2>
+        <div class="action-area">
+          <button id="convertButton" class="action-button">
+            <i class="fas fa-sync-alt"></i> Convert Data
+          </button>
+          <div id="progressContainer" class="hidden">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText">Converting...</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-container hidden" id="step3">
+        <h2>Preview & Download</h2>
+        <div class="preview-area">
+          <div class="preview-container">
+            <div class="table-container" id="tableContainer"></div>
+            <div class="stats-container" id="statsContainer"></div>
+          </div>
+
+          <a id="downloadButton" class="action-button">
+            <i class="fas fa-download"></i> Download SleepHQ-Ready File
+          </a>
+          <button id="newFileButton" class="secondary-button">
+            <i class="fas fa-redo-alt"></i> Convert Another File
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <div id="errorPanel" class="error-panel hidden">
+      <button class="close-button" id="closeErrorBtn">&times;</button>
+      <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+      <p id="errorMessage"></p>
+    </div>
+
+    <footer>
+      <p>Made with <span class="heart">♥</span> for better sleep tracking | &copy; 2023 Sleep Ring Converter</p>
+    </footer>
+  </div>
+
+  <script>
+    // Create app namespace
+    window.app = {};
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const fileInfo = document.getElementById('fileInfo');
+      const convertButton = document.getElementById('convertButton');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressFill = document.getElementById('progressFill');
+      const progressText = document.getElementById('progressText');
+      const tableContainer = document.getElementById('tableContainer');
+      const statsContainer = document.getElementById('statsContainer');
+      const downloadButton = document.getElementById('downloadButton');
+      const newFileButton = document.getElementById('newFileButton');
+      const step1 = document.getElementById('step1');
+      const step2 = document.getElementById('step2');
+      const step3 = document.getElementById('step3');
+
+      // Store current file and processed data
+      let currentFile = null;
+      let lastProcessedFile = null;
+      let convertedData = null;
+
+      // Event Listeners
+      dropZone.addEventListener('dragover', handleDragOver);
+      dropZone.addEventListener('dragleave', handleDragLeave);
+      dropZone.addEventListener('drop', handleDrop);
+      dropZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', handleFileSelect);
+      convertButton.addEventListener('click', handleConvert);
+      downloadButton.addEventListener('click', handleDownload);
+      newFileButton.addEventListener('click', resetToFileUpload);
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+      }
+
+      function handleDragLeave(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          handleFile(files[0]);
+        }
+      }
+
+      function handleFileSelect(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+          handleFile(files[0]);
+        }
+      }
+
+      function handleFile(file) {
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        if (fileExt !== 'csv' && fileExt !== 'xlsx') {
+          showError('Please select a CSV or Excel file.');
+          return;
+        }
+
+        // Accept any input filename
+        fileInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
+        currentFile = file;
+
+        step2.classList.remove('hidden');
+        step2.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      function handleDownload(e) {
+        if (!convertedData || convertedData.length < 2) {
+          e.preventDefault();
+          showError('No data available for download.');
+          return;
+        }
+      }
+
+      function handleConvert() {
+        if (!currentFile) {
+          showError('Please select a file first.');
+          return;
+        }
+
+        if (lastProcessedFile === currentFile) {
+          step3.classList.remove('hidden');
+          step3.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+
+        progressContainer.classList.remove('hidden');
+        convertButton.classList.add('hidden');
+        updateProgress(10, 'Reading file...');
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+          updateProgress(30, 'Parsing data...');
+          setTimeout(() => processFileData(e.target.result), 200);
+        };
+
+        reader.onerror = function() {
+          showError('Error reading file. Please try again.');
+          resetProgress();
+        };
+
+        if (currentFile.name.toLowerCase().endsWith('.xlsx')) {
+          reader.readAsArrayBuffer(currentFile);
+        } else {
+          reader.readAsText(currentFile);
+        }
+      }
+
+      function processFileData(result) {
+        try {
+          let data = [];
+          const isExcel = currentFile.name.toLowerCase().endsWith('.xlsx');
+
+          if (isExcel) {
+            updateProgress(40, 'Processing Excel data...');
+            const workbook = XLSX.read(result, { 
+              type: 'array',
+              cellDates: true,
+              dateNF: 'yyyy-mm-dd hh:mm:ss'
+            });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+          } else {
+            updateProgress(40, 'Processing CSV data...');
+            data = parseCSV(result);
+          }
+
+          if (!data || data.length < 2) {
+            throw new Error('File is empty or has no data rows.');
+          }
+
+          updateProgress(60, 'Converting format...');
+
+          const convertedResult = convertToSleepHQ(data);
+          convertedData = convertedResult.data;
+
+          updateProgress(80, 'Generating preview...');
+
+          createPreviewTable(convertedData);
+          createStatsDisplay(convertedResult.stats);
+          prepareDownload();
+
+          lastProcessedFile = currentFile;
+
+          updateProgress(100, 'Completed!');
+          setTimeout(() => {
+            progressContainer.classList.add('hidden');
+            convertButton.classList.remove('hidden');
+            step3.classList.remove('hidden');
+            step3.scrollIntoView({ behavior: 'smooth' });
+          }, 500);
+        } catch (error) {
+          console.error('Processing error:', error);
+          showError(`Error processing file: ${error.message}`);
+          resetProgress();
+        }
+      }
+
+      function convertToSleepHQ(data) {
+        const headers = data[0].map(h => String(h).trim().toLowerCase());
+
+        const timeIdx = findColumnIndex(headers, ["time", "date", "datetime", "timestamp"]);
+        const spo2Idx = findColumnIndex(headers, ["oxygen", "o2", "spo2", "spo2%", "oxygen saturation", "oxygen level"]);
+        const prIdx = findColumnIndex(headers, ["heart", "pulse", "pr", "hr", "heart rate", "pulse rate"]);
+        const motionIdx = findColumnIndex(headers, ["active", "motion", "movement", "activity"]);
+
+        // Validate required columns
+        if (timeIdx === -1 || spo2Idx === -1 || prIdx === -1) {
+          throw new Error('Required columns not found. Please check your file format.');
+        }
+
+        // Ensure correct header format for SleepHQ
+        const outRows = [
+          ["Time", "Oxygen Level", "Pulse Rate", "Motion", "O2 Reminder", "PR Reminder"]
+        ];
+        const rowSet = new Set();
+        let validReadingsCount = 0;
+        let spo2Sum = 0;
+        let prSum = 0;
+
+        const stats = {
+          totalRows: data.length - 1,
+          validRows: 0,
+          invalidRows: 0,
+          duplicates: 0,
+          minSpo2: 100,
+          maxSpo2: 0,
+          avgSpo2: 0,
+          minPR: 300,
+          maxPR: 0,
+          avgPR: 0,
+          spo2Sum: 0,
+          prSum: 0
+        };
+
+        // Get the first valid date to ensure we're only processing one day
+        let firstDate = null;
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length < timeIdx + 1) continue;
+          
+          const rawTime = row[timeIdx];
+          if (!rawTime) continue;
+          
+          try {
+            const dt = parseDateTime(rawTime);
+            if (dt && !isNaN(dt.getTime())) {
+              firstDate = dt;
+              break;
+            }
+          } catch (error) {
+            continue;
+          }
+        }
+
+        if (!firstDate) {
+          throw new Error('No valid dates found in the data.');
+        }
+
+        // Group readings by minute
+        const readingsByMinute = new Map();
+
+        // Process each data row
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length < Math.max(timeIdx, spo2Idx, prIdx) + 1) {
+            stats.invalidRows++;
+            continue;
+          }
+
+          const rawTime = row[timeIdx];
+          if (!rawTime) {
+            stats.invalidRows++;
+            continue;
+          }
+
+          let dt;
+          try {
+            dt = parseDateTime(rawTime);
+            if (!dt || isNaN(dt.getTime())) {
+              stats.invalidRows++;
+              continue;
+            }
+
+            // Skip rows from different days
+            if (dt.getDate() !== firstDate.getDate() || 
+                dt.getMonth() !== firstDate.getMonth() || 
+                dt.getFullYear() !== firstDate.getFullYear()) {
+              continue;
+            }
+          } catch (error) {
+            console.error("Date parsing error:", error, rawTime);
+            stats.invalidRows++;
+            continue;
+          }
+
+          // Format time exactly as in the working example: DD/MM/YYYY HH:mm:ss
+          const day = dt.getDate().toString().padStart(2, '0');
+          const month = (dt.getMonth() + 1).toString().padStart(2, '0');
+          const year = dt.getFullYear();
+          const hours = dt.getHours().toString().padStart(2, '0');
+          const minutes = dt.getMinutes().toString().padStart(2, '0');
+          const seconds = dt.getSeconds().toString().padStart(2, '0');
+          const fmtTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+
+          // Parse SpO2 and PR values
+          let spo2Val = Number(row[spo2Idx]);
+          let prVal = Number(row[prIdx]);
+
+          // Replace any non-numeric or invalid values with 0
+          if (isNaN(spo2Val) || spo2Val < 70 || spo2Val > 100) {
+            spo2Val = 0;
+          }
+
+          if (isNaN(prVal) || prVal < 40 || prVal > 200) {
+            prVal = 0;
+          }
+
+          const spo2 = Math.round(spo2Val);
+          const pr = Math.round(prVal);
+
+          // Only count valid readings for stats
+          if (spo2 > 0 && pr > 0) {
+            stats.validRows++;
+            stats.spo2Sum += spo2;
+            stats.prSum += pr;
+
+            if (spo2 < stats.minSpo2 || stats.minSpo2 === 0) stats.minSpo2 = spo2;
+            if (spo2 > stats.maxSpo2) stats.maxSpo2 = spo2;
+
+            if (pr < stats.minPR || stats.minPR === 0) stats.minPR = pr;
+            if (pr > stats.maxPR) stats.maxPR = pr;
+          } else {
+            stats.invalidRows++;
+            continue;
+          }
+
+          // Handle motion values exactly as in the working example (0 or raw value)
+          let motion = 0;
+          if (motionIdx !== -1 && row[motionIdx]) {
+            motion = Number(row[motionIdx]);
+          }
+
+          // Group readings by minute
+          const minuteKey = fmtTime;
+          if (!readingsByMinute.has(minuteKey)) {
+            readingsByMinute.set(minuteKey, []);
+          }
+          readingsByMinute.get(minuteKey).push({
+            time: fmtTime,
+            spo2: spo2,
+            pr: pr,
+            motion: motion
+          });
+        }
+
+        // Process grouped readings
+        for (const [minuteKey, readings] of readingsByMinute) {
+          // Sort readings by motion (8 first, then 5, then 0)
+          readings.sort((a, b) => b.motion - a.motion);
+          
+          // Add all readings for this minute
+          for (const reading of readings) {
+            const outputRow = [
+              reading.time,
+              reading.spo2.toString(),
+              reading.pr.toString(),
+              reading.motion.toString(),
+              "0",
+              "0"
+            ];
+            const lineKey = outputRow.join(',');
+            
+            if (!rowSet.has(lineKey)) {
+              rowSet.add(lineKey);
+              outRows.push(outputRow);
+            } else {
+              stats.duplicates++;
+            }
+          }
+        }
+
+        // Calculate averages only if we have valid readings
+        if (stats.validRows > 0) {
+          stats.avgSpo2 = Math.round(stats.spo2Sum / stats.validRows);
+          stats.avgPR = Math.round(stats.prSum / stats.validRows);
+        }
+
+        // Ensure all numeric values are valid
+        if (stats.minSpo2 === 100) stats.minSpo2 = 0;
+        if (stats.maxSpo2 === 0) stats.maxSpo2 = 0;
+        if (stats.minPR === 300) stats.minPR = 0;
+        if (stats.maxPR === 0) stats.maxPR = 0;
+
+        return {
+          data: outRows,
+          stats: stats
+        };
+      }
+
+      function parseCSV(csvText) {
+        const lines = csvText.split(/\r?\n/);
+        const result = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const row = [];
+          let inQuotes = false;
+          let currentValue = "";
+
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+
+            if (char === '"' && (j === 0 || line[j-1] !== '\\')) {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              row.push(currentValue);
+              currentValue = "";
+            } else {
+              currentValue += char;
+            }
+          }
+
+          row.push(currentValue);
+          result.push(row);
+        }
+
+        return result;
+      }
+
+      function parseDateTime(rawTime) {
+        if (typeof rawTime === 'number') {
+          return new Date(XLSX.SSF.parse_date_code(rawTime));
+        } else if (rawTime instanceof Date) {
+          return rawTime;
+        }
+
+        let timeStr = String(rawTime).trim();
+
+        if (/\b(am|pm)\b/i.test(timeStr)) {
+          const match = timeStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2})(?::(\d{2}))? ?([ap]m)/i);
+          if (match) {
+            const [_, month, day, year, hours, minutes, seconds, ampm] = match;
+            let hour = parseInt(hours);
+
+            if (ampm.toLowerCase() === 'pm' && hour < 12) hour += 12;
+            if (ampm.toLowerCase() === 'am' && hour === 12) hour = 0;
+
+            timeStr = `${day}/${month}/${year} ${hour.toString().padStart(2, '0')}:${minutes}`;
+          }
+        }
+
+        let dt = new Date(timeStr);
+
+        if (isNaN(dt.getTime())) {
+          const parts = timeStr.split(' ')[0].split('/');
+          if (parts.length === 3) {
+            timeStr = `${parts[1]}/${parts[0]}/${parts[2]} ${timeStr.split(' ')[1] || ''}`.trim();
+            dt = new Date(timeStr);
+          }
+
+          if (isNaN(dt.getTime())) {
+            const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+            if (match) {
+              const [_, year, month, day, hours, minutes, seconds] = match;
+              dt = new Date(
+                parseInt(year),
+                parseInt(month) - 1,
+                parseInt(day),
+                parseInt(hours || '0'),
+                parseInt(minutes || '0'),
+                parseInt(seconds || '0')
+              );
+            }
+          }
+        }
+
+        return dt;
+      }
+
+      function formatDateTime(dt) {
+        return `${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getFullYear()} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
+      }
+
+      function findColumnIndex(headers, possibleNames) {
+        for (const name of possibleNames) {
+          const index = headers.findIndex(h => h.includes(name));
+          if (index !== -1) return index;
+        }
+        return -1;
+      }
+
+      function createPreviewTable(data) {
+        if (!data || data.length < 2) {
+          tableContainer.innerHTML = '<p>No valid data found.</p>';
+          return;
+        }
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+
+        const headerRow = document.createElement('tr');
+        data[0].forEach(header => {
+          const th = document.createElement('th');
+          th.textContent = header;
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        const maxRows = Math.min(10, data.length - 1);
+        for (let i = 1; i <= maxRows; i++) {
+          const tr = document.createElement('tr');
+          data[i].forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        }
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableContainer.innerHTML = '';
+        tableContainer.appendChild(table);
+
+        if (data.length - 1 > maxRows) {
+          const noteDiv = document.createElement('div');
+          noteDiv.className = 'small';
+          noteDiv.style.marginTop = '1rem';
+          noteDiv.textContent = `Showing ${maxRows} of ${data.length - 1} rows. Download to see all data.`;
+          tableContainer.appendChild(noteDiv);
+        }
+      }
+
+      function createStatsDisplay(stats) {
+        statsContainer.innerHTML = '';
+
+        const statsData = [
+          { label: 'Valid Readings', value: stats.validRows.toLocaleString() },
+          { label: 'Avg SpO2', value: stats.avgSpo2 + '%' },
+          { label: 'Min SpO2', value: stats.minSpo2 + '%' },
+          { label: 'Max SpO2', value: stats.maxSpo2 + '%' },
+          { label: 'Avg Pulse Rate', value: stats.avgPR + ' BPM' },
+          { label: 'Min Pulse Rate', value: stats.minPR + ' BPM' },
+          { label: 'Max Pulse Rate', value: stats.maxPR + ' BPM' },
+          { label: 'Duplicates Removed', value: stats.duplicates.toLocaleString() }
+        ];
+
+        statsData.forEach(stat => {
+          const statCard = document.createElement('div');
+          statCard.className = 'stat-card';
+
+          const statValue = document.createElement('div');
+          statValue.className = 'stat-number';
+          statValue.textContent = stat.value;
+
+          const statLabel = document.createElement('div');
+          statLabel.className = 'stat-label';
+          statLabel.textContent = stat.label;
+
+          statCard.appendChild(statValue);
+          statCard.appendChild(statLabel);
+          statsContainer.appendChild(statCard);
+        });
+      }
+
+      function prepareDownload() {
+        if (!convertedData || convertedData.length < 2) {
+          return;
+        }
+
+        // Extract timestamp from input filename (e.g., RawData-Second-UserId(3709)-20250506213317O09fcwzW.xlsx -> 20250506213317)
+        let filename;
+        console.log('Original filename:', currentFile.name);
+        
+        // Updated regex to match the exact format: YYYYMMDDHHMMSS followed by optional characters
+        const timestampMatch = currentFile.name.match(/(\d{14})[^.]*/);
+        console.log('Timestamp match:', timestampMatch);
+        
+        if (timestampMatch && timestampMatch[1]) {
+            filename = timestampMatch[1];  // Keep only the 14-digit timestamp
+            console.log('Extracted filename:', filename);
+        } else {
+            // If no timestamp in filename, try to get it from the first data row
+            try {
+                const firstRow = convertedData[1][0]; // Get the time from first data row
+                console.log('First row time:', firstRow);
+                const dt = parseDateTime(firstRow);
+                if (dt && !isNaN(dt.getTime())) {
+                    const year = dt.getFullYear();
+                    const month = (dt.getMonth() + 1).toString().padStart(2, '0');
+                    const day = dt.getDate().toString().padStart(2, '0');
+                    const hours = dt.getHours().toString().padStart(2, '0');
+                    const minutes = dt.getMinutes().toString().padStart(2, '0');
+                    const seconds = dt.getSeconds().toString().padStart(2, '0');
+                    filename = `${year}${month}${day}${hours}${minutes}${seconds}`;
+                    console.log('Generated filename from date:', filename);
+                } else {
+                    // Fallback to current timestamp if no valid date found
+                    const now = new Date();
+                    filename = now.getFullYear() +
+                        (now.getMonth() + 1).toString().padStart(2, '0') +
+                        now.getDate().toString().padStart(2, '0') +
+                        now.getHours().toString().padStart(2, '0') +
+                        now.getMinutes().toString().padStart(2, '0') +
+                        now.getSeconds().toString().padStart(2, '0');
+                    console.log('Fallback filename:', filename);
+                }
+            } catch (error) {
+                console.error('Error generating filename:', error);
+                // Fallback to current timestamp if any error occurs
+                const now = new Date();
+                filename = now.getFullYear() +
+                    (now.getMonth() + 1).toString().padStart(2, '0') +
+                    now.getDate().toString().padStart(2, '0') +
+                    now.getHours().toString().padStart(2, '0') +
+                    now.getMinutes().toString().padStart(2, '0') +
+                    now.getSeconds().toString().padStart(2, '0');
+                console.log('Error fallback filename:', filename);
+            }
+        }
+
+        // Create CSV content exactly matching the working example format
+        const csvContent = convertedData.map(row => row.join(',')).join('\n') + '\n';
+        
+        // Create blob with explicit UTF-8 encoding but NO BOM
+        const blob = new Blob([csvContent], { 
+            type: 'text/csv'
+        });
+
+        // Clean up any existing object URL
+        if (downloadButton.href) {
+            URL.revokeObjectURL(downloadButton.href);
+        }
+
+        // Create new object URL and set download attributes
+        const url = URL.createObjectURL(blob);
+
+        downloadButton.href = url;
+        downloadButton.download = filename + '.csv';  // Use lowercase .csv extension
+        console.log('Final download filename:', downloadButton.download);
+        downloadButton.classList.remove('hidden');
+      }
+
+      function resetToFileUpload() {
+        fileInput.value = '';
+        fileInfo.textContent = '';
+        tableContainer.innerHTML = '';
+        statsContainer.innerHTML = '';
+        step2.classList.add('hidden');
+        step3.classList.add('hidden');
+        progressContainer.classList.add('hidden');
+        convertButton.classList.remove('hidden');
+        currentFile = null;
+
+        step1.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      function updateProgress(percent, message) {
+        progressFill.style.width = `${percent}%`;
+        progressText.textContent = message;
+      }
+
+      function resetProgress() {
+        progressContainer.classList.add('hidden');
+        convertButton.classList.remove('hidden');
+        updateProgress(0, '');
+      }
+
+      function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' bytes';
+        else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        else return (bytes / 1048576).toFixed(1) + ' MB';
+      }
+
+      function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorPanel').classList.remove('hidden');
+      }
+      document.getElementById('closeErrorBtn').addEventListener('click', () => {
+        document.getElementById('errorPanel').classList.add('hidden');
+      });
+    });
+  </script>
+</body>
+</html>
