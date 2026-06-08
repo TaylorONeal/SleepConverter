@@ -1,1106 +1,1136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Sleep Ring Converter | SleepON to SleepHQ</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0e0e1a" />
+  <meta name="description" content="Convert SleepON / Go2Sleep ring data into a SleepHQ-ready O2 Ring CSV. 100% offline, in your browser." />
+  <title>Sleep Ring Converter · SleepON → SleepHQ</title>
+
+  <!-- SheetJS for Excel (.xlsx/.xls) parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+
+  <style>
     :root {
-      --primary: #ff41a4;
-      --secondary: #1fc8db;
-      --background: #121212;
-      --surface: #1e1e2f;
-      --surface-light: #2a2a3a;
-      --text: #ffffff;
-      --text-secondary: #bdc8f0;
-      --success: #4caf50;
-      --danger: #ff5252;
-      --warning: #ffc107;
-      --header-height: 120px;
-      --glow-radius: 10px;
+      --primary: #ff52a8;
+      --primary-2: #b14dff;
+      --secondary: #22d3ee;
+      --accent: #34d399;
+      --bg: #0c0c16;
+      --bg-2: #14142a;
+      --surface: rgba(255, 255, 255, 0.045);
+      --surface-2: rgba(255, 255, 255, 0.07);
+      --stroke: rgba(255, 255, 255, 0.10);
+      --stroke-strong: rgba(255, 255, 255, 0.22);
+      --text: #f4f5ff;
+      --muted: #a8b0d8;
+      --muted-2: #6f78a8;
+      --danger: #ff5c6c;
+      --warning: #ffc34d;
+      --radius: 18px;
+      --radius-sm: 12px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+      --tap: 56px; /* minimum touch target */
+      --maxw: 760px;
+      --ease: cubic-bezier(.22, 1, .36, 1);
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { -webkit-text-size-adjust: 100%; }
 
     body {
-      font-family: 'IBM Plex Sans', sans-serif;
-      background: linear-gradient(45deg, var(--background), #2d2d42);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: var(--text);
-      min-height: 100vh;
-      line-height: 1.6;
+      background:
+        radial-gradient(1200px 600px at 15% -10%, rgba(177, 77, 255, 0.18), transparent 60%),
+        radial-gradient(1000px 600px at 100% 0%, rgba(34, 211, 238, 0.14), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      background-attachment: fixed;
+      min-height: 100dvh;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
 
-    .container {
-      max-width: 1200px;
+    .wrap {
+      width: 100%;
+      max-width: var(--maxw);
       margin: 0 auto;
-      padding: 2rem;
+      padding: 28px 18px 64px;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+      gap: 22px;
     }
 
-    header {
-      text-align: center;
-      margin-bottom: 3rem;
-      animation: fadeIn 1s ease-out;
-    }
+    /* ---------- Header ---------- */
+    header { text-align: center; padding-top: 14px; animation: rise .7s var(--ease) both; }
 
-    .logo-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-
-    .logo-rings {
+    .logo {
+      width: 76px; height: 76px; margin: 0 auto 14px;
       position: relative;
-      width: 80px;
-      height: 80px;
-      margin: 1rem auto;
     }
-
-    .ring {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+    .logo .ring {
+      position: absolute; inset: 0; border-radius: 50%;
       border: 3px solid transparent;
-      border-radius: 50%;
+    }
+    .logo .ring:nth-child(1) { border-top-color: var(--primary);   animation: spin 7s linear infinite; }
+    .logo .ring:nth-child(2) { border-right-color: var(--secondary); inset: 9px; animation: spin 5s linear infinite reverse; }
+    .logo .ring:nth-child(3) { border-bottom-color: var(--accent);  inset: 18px; animation: spin 9s linear infinite; }
+    .logo .zzz {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      font-size: 24px; font-weight: 800; color: var(--text); opacity: .9;
     }
 
-    .ring:nth-child(1) {
-      border-top-color: var(--primary);
-      animation: ringPulse 3s infinite, rotate 8s linear infinite;
+    h1 {
+      font-size: clamp(1.7rem, 6vw, 2.5rem);
+      font-weight: 800; letter-spacing: -0.02em; line-height: 1.1;
+      background: linear-gradient(95deg, var(--primary), var(--primary-2) 45%, var(--secondary));
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
     }
-
-    .ring:nth-child(2) {
-      border-right-color: var(--secondary);
-      animation: ringPulse 3s infinite 0.5s, rotate 6s linear infinite reverse;
+    .subtitle { color: var(--muted); font-size: clamp(.95rem, 3.4vw, 1.08rem); margin-top: 8px; }
+    .privacy {
+      margin-top: 12px; display: inline-flex; align-items: center; gap: 7px;
+      font-size: .82rem; color: var(--muted); background: var(--surface);
+      border: 1px solid var(--stroke); padding: 7px 13px; border-radius: 999px;
     }
+    .privacy svg { width: 15px; height: 15px; color: var(--accent); }
 
-    .ring:nth-child(3) {
-      border-bottom-color: var(--success);
-      animation: ringPulse 3s infinite 1s, rotate 10s linear infinite;
+    /* ---------- Stepper ---------- */
+    .stepper {
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; flex-wrap: wrap; margin: 2px auto 0;
     }
-
-    .step-number {
-      position: absolute;
-      top: -20px;
-      left: -20px;
-      width: 40px;
-      height: 40px;
+    .step { display: flex; align-items: center; gap: 9px; }
+    .step .dot {
+      width: 30px; height: 30px; border-radius: 50%; flex: none;
+      display: grid; place-items: center; font-weight: 700; font-size: .85rem;
+      background: var(--surface-2); border: 1px solid var(--stroke);
+      color: var(--muted); transition: all .4s var(--ease);
+    }
+    .step .name { font-size: .82rem; color: var(--muted-2); transition: color .3s ease; }
+    .step.active .dot {
       background: linear-gradient(135deg, var(--primary), var(--secondary));
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 1.2rem;
-      color: white;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 0 0 4px rgba(255, 82, 168, 0.16);
+      transform: scale(1.06);
     }
+    .step.active .name { color: var(--text); }
+    .step.done .dot { background: rgba(52, 211, 153, .18); border-color: var(--accent); color: var(--accent); }
+    .step .bar { width: 26px; height: 2px; background: var(--stroke); border-radius: 2px; }
+    @media (max-width: 460px) { .step .name { display: none; } .step .bar { width: 18px; } }
 
-    .error-panel {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--danger);
-      color: white;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      z-index: 1000;
-      max-width: 400px;
-      width: 90%;
+    /* ---------- Card ---------- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      animation: rise .6s var(--ease) both;
     }
-
-    .heart {
-      color: var(--danger);
-      animation: pulse 1s infinite;
+    .card h2 { font-size: 1.18rem; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 9px; }
+    .card h2 .num {
+      width: 26px; height: 26px; border-radius: 8px; flex: none;
+      display: grid; place-items: center; font-size: .85rem;
+      background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff;
     }
+    .card .hint { color: var(--muted); font-size: .9rem; margin-top: 4px; }
 
-    @keyframes ringPulse {
-      0% { transform: scale(0.8); opacity: 0.3; }
-      50% { transform: scale(1.1); opacity: 0.7; }
-      100% { transform: scale(0.8); opacity: 0.3; }
-    }
-
-    @keyframes rotate {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.2); }
-      100% { transform: scale(1); }
-    }
-
-    .neon-text {
-      font-size: 3.5rem;
-      font-weight: 600;
-      color: var(--text);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      animation: glow 3s infinite alternate;
-      background: linear-gradient(90deg, var(--primary), var(--secondary));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 0.5rem;
-    }
-
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 1.2rem;
-      font-weight: 300;
-    }
-
-    .step-container {
-      background: linear-gradient(135deg, var(--surface) 0%, var(--surface-light) 100%);
-      border-radius: 16px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-      position: relative;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      overflow: hidden;
-      animation: fadeIn 0.5s ease-out;
-      transition: all 0.3s ease;
-    }
-
-    .upload-area {
-      background: var(--surface-light);
-      border: 2px dashed var(--text-secondary);
-      border-radius: 12px;
-      padding: 3rem 2rem;
+    /* ---------- Dropzone ---------- */
+    .dropzone {
+      margin-top: 16px;
+      border: 2px dashed var(--stroke-strong);
+      border-radius: var(--radius);
+      padding: 30px 18px;
       text-align: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
+      transition: border-color .25s ease, background .25s ease, transform .25s var(--ease);
       position: relative;
-      z-index: 1;
     }
-
-    .upload-area:hover {
+    .dropzone.drag {
       border-color: var(--secondary);
-      background-color: rgba(31, 200, 219, 0.05);
+      background: rgba(34, 211, 238, 0.07);
+      transform: scale(1.012);
+    }
+    .dropzone .cloud {
+      width: 58px; height: 58px; margin: 0 auto 10px; color: var(--secondary);
+      transition: transform .3s var(--ease);
+    }
+    .dropzone.drag .cloud { transform: translateY(-6px) scale(1.06); }
+    .dropzone p { color: var(--muted); font-size: .95rem; }
+    .dropzone .or { color: var(--muted-2); font-size: .8rem; margin: 12px 0; text-transform: uppercase; letter-spacing: .12em; }
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      -webkit-tap-highlight-color: transparent;
+      appearance: none; border: none; cursor: pointer;
+      min-height: var(--tap);
+      padding: 0 24px;
+      border-radius: 999px;
+      font-size: 1.02rem; font-weight: 700; letter-spacing: .01em;
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform .15s var(--ease), box-shadow .25s ease, filter .25s ease, opacity .2s ease;
+      text-decoration: none; user-select: none; line-height: 1;
+    }
+    .btn svg { width: 20px; height: 20px; }
+    .btn:active { transform: translateY(1px) scale(.985); }
+    .btn:focus-visible { outline: 3px solid rgba(34, 211, 238, .6); outline-offset: 3px; }
+
+    .btn-primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2) 55%, var(--secondary));
+      background-size: 180% 180%;
+      box-shadow: 0 10px 26px rgba(177, 77, 255, .32);
+      animation: sheen 6s ease infinite;
+    }
+    .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 14px 34px rgba(177, 77, 255, .42); }
+    .btn-primary[disabled] { opacity: .5; cursor: not-allowed; filter: grayscale(.3); box-shadow: none; animation: none; }
+
+    .btn-ghost {
+      color: var(--text); background: var(--surface-2);
+      border: 1px solid var(--stroke-strong); font-weight: 600;
+    }
+    .btn-ghost:hover { background: rgba(255, 255, 255, .12); }
+
+    .btn-block { width: 100%; }
+    .btn-lg { min-height: 60px; font-size: 1.08rem; }
+
+    .btn-row { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    @media (min-width: 560px) {
+      .btn-row { flex-direction: row; }
+      .btn-row .btn { flex: 1; }
     }
 
-    .icon-container {
-      display: flex;
-      gap: 1.5rem;
-      justify-content: center;
-      margin-bottom: 1rem;
+    /* file chip */
+    .file-chip {
+      margin-top: 16px;
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface-2); border: 1px solid var(--stroke);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      animation: rise .3s var(--ease) both;
     }
-
-    .upload-icon {
-      font-size: 3rem;
-      color: var(--text-secondary);
+    .file-chip .ic { width: 38px; height: 38px; flex: none; border-radius: 10px; display: grid; place-items: center;
+      background: rgba(34, 211, 238, .14); color: var(--secondary); }
+    .file-chip .ic svg { width: 20px; height: 20px; }
+    .file-chip .meta { flex: 1; min-width: 0; }
+    .file-chip .name { font-weight: 600; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-chip .sz { font-size: .8rem; color: var(--muted-2); }
+    .file-chip .rm {
+      flex: none; width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+      background: transparent; color: var(--muted); display: grid; place-items: center;
+      transition: background .2s ease, color .2s ease;
     }
+    .file-chip .rm:hover { background: rgba(255, 92, 108, .15); color: var(--danger); }
+    .file-chip .rm svg { width: 18px; height: 18px; }
 
-    .file-select-button {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-      color: white;
-      padding: 0.8rem 1.5rem;
-      border-radius: 50px;
-      display: inline-block;
-      margin-top: 1rem;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      box-shadow: 0 5px 15px rgba(255, 65, 164, 0.3);
-    }
-
-    .action-button {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-      color: white;
-      border: none;
-      padding: 1rem 2rem;
-      border-radius: 50px;
-      font-size: 1.1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      min-width: 200px;
-      text-decoration: none;
-      box-shadow: 0 5px 15px rgba(255, 65, 164, 0.3);
-    }
-
-    .secondary-button {
-      background: transparent;
-      color: var(--text);
-      border: 2px solid var(--text-secondary);
-      padding: 0.8rem 1.5rem;
-      border-radius: 50px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 10px;
-      background-color: var(--surface-light);
-      border-radius: 5px;
-      overflow: hidden;
-      margin-bottom: 0.5rem;
-    }
-
-    .progress-fill {
-      height: 100%;
-      width: 0%;
+    /* ---------- Progress ---------- */
+    .progress { margin-top: 16px; }
+    .progress .track { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+    .progress .fill {
+      height: 100%; width: 0%; border-radius: 999px;
       background: linear-gradient(90deg, var(--primary), var(--secondary));
-      transition: width 0.3s ease;
+      background-size: 200% 100%;
+      transition: width .4s var(--ease);
+      animation: flow 1.2s linear infinite;
     }
+    .progress .label { margin-top: 9px; font-size: .88rem; color: var(--muted); text-align: center; }
 
-    .preview-container {
-      width: 100%;
-      background: var(--surface-light);
-      border-radius: 12px;
-      padding: 1.5rem;
-      max-height: 350px;
-      overflow-y: auto;
+    /* ---------- Stats ---------- */
+    .stats {
+      display: grid; gap: 12px; margin-top: 4px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     }
+    .stat {
+      background: var(--surface-2); border: 1px solid var(--stroke);
+      border-radius: var(--radius-sm); padding: 14px; text-align: center;
+      animation: rise .5s var(--ease) both;
+    }
+    .stat .v { font-size: 1.5rem; font-weight: 800; letter-spacing: -.01em;
+      background: linear-gradient(120deg, var(--secondary), var(--accent));
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .stat .l { font-size: .78rem; color: var(--muted); margin-top: 3px; }
 
-    .table-container {
-      width: 100%;
-      overflow-x: auto;
+    /* ---------- Table ---------- */
+    .table-wrap {
+      margin-top: 16px; border: 1px solid var(--stroke); border-radius: var(--radius-sm);
+      overflow: auto; max-height: 320px; -webkit-overflow-scrolling: touch;
     }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+    thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: #181830; text-align: left; padding: 11px 12px; font-weight: 700;
+      color: var(--secondary); white-space: nowrap;
+      border-bottom: 1px solid var(--stroke);
+    }
+    tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, .05); white-space: nowrap; color: var(--muted); }
+    tbody tr:last-child td { border-bottom: none; }
+    .table-note { margin-top: 8px; font-size: .8rem; color: var(--muted-2); text-align: center; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      color: var(--text);
+    /* ---------- Disclosure / log ---------- */
+    details.disc { margin-top: 16px; border-top: 1px solid var(--stroke); padding-top: 12px; }
+    details.disc summary {
+      cursor: pointer; list-style: none; font-size: .9rem; color: var(--muted);
+      display: flex; align-items: center; gap: 8px; min-height: 40px; user-select: none;
     }
+    details.disc summary::-webkit-details-marker { display: none; }
+    details.disc summary .chev { width: 16px; height: 16px; transition: transform .25s ease; }
+    details.disc[open] summary .chev { transform: rotate(90deg); }
+    .log {
+      margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .8rem; color: var(--muted); background: rgba(0, 0, 0, .25);
+      border: 1px solid var(--stroke); border-radius: var(--radius-sm);
+      padding: 12px 14px; white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto;
+    }
+    .log .ok { color: var(--accent); }
+    .log .warn { color: var(--warning); }
+    .log .err { color: var(--danger); }
 
-    th {
-      background-color: rgba(31, 200, 219, 0.2);
-      text-align: left;
-      padding: 0.8rem;
-      font-weight: 600;
-      border-bottom: 2px solid var(--secondary);
+    /* segmented control for date order */
+    .field { margin-top: 16px; }
+    .field > label { font-size: .85rem; color: var(--muted); display: block; margin-bottom: 8px; }
+    .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--stroke); border-radius: 999px; padding: 4px; gap: 4px; width: 100%; }
+    .seg button {
+      flex: 1; min-height: 44px; border: none; background: transparent; color: var(--muted);
+      font-weight: 600; font-size: .85rem; border-radius: 999px; cursor: pointer; transition: all .2s ease;
     }
+    .seg button.on { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; }
 
-    td {
-      padding: 0.8rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    /* success check */
+    .success-burst {
+      width: 70px; height: 70px; margin: 6px auto 14px; border-radius: 50%;
+      display: grid; place-items: center; background: rgba(52, 211, 153, .15); border: 2px solid var(--accent);
+      animation: pop .5s var(--ease) both;
     }
+    .success-burst svg { width: 36px; height: 36px; color: var(--accent); }
+    .success-burst svg path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .5s .15s var(--ease) forwards; }
 
-    .stats-container {
-      margin-top: 1.5rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      justify-content: center;
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom));
+      transform: translate(-50%, 140%);
+      background: #1c1530; border: 1px solid var(--danger);
+      color: var(--text); padding: 14px 16px; border-radius: 14px;
+      box-shadow: var(--shadow); z-index: 1000; max-width: min(440px, 92vw);
+      display: flex; align-items: center; gap: 12px;
+      transition: transform .45s var(--ease);
     }
+    .toast.show { transform: translate(-50%, 0); }
+    .toast svg.ic { width: 22px; height: 22px; color: var(--danger); flex: none; }
+    .toast .msg { font-size: .9rem; }
+    .toast .x { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+    .toast .x:hover { background: rgba(255, 255, 255, .1); }
 
-    .stat-card {
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-      flex: 1;
-      min-width: 150px;
-      backdrop-filter: blur(5px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
+    footer { text-align: center; color: var(--muted-2); font-size: .82rem; padding-top: 4px; }
+    footer .heart { color: var(--primary); }
+    footer a { color: var(--muted); }
 
-    .stat-number {
-      font-size: 1.8rem;
-      font-weight: bold;
-      color: var(--secondary);
-      margin-bottom: 0.5rem;
-    }
+    .hidden { display: none !important; }
+    .spin { animation: spin 1s linear infinite; }
 
-    .stat-label {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-    }
+    /* ---------- Animations ---------- */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    @keyframes flow { to { background-position: 200% 0; } }
+    @keyframes sheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 
-    .hidden {
-      display: none !important;
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+      .logo .ring { animation: none; }
     }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes glow {
-      0% { filter: drop-shadow(0 0 var(--glow-radius) rgba(255, 65, 164, 0.7)); }
-      50% { filter: drop-shadow(0 0 calc(var(--glow-radius) * 1.5) rgba(31, 200, 219, 0.9)); }
-      100% { filter: drop-shadow(0 0 var(--glow-radius) rgba(255, 65, 164, 0.7)); }
-    }
-
-    @media (max-width: 768px) {
-      .container { padding: 1rem; }
-      .neon-text { font-size: 2.5rem; }
-      .step-container { padding: 1.5rem; }
-      .upload-area { padding: 2rem 1rem; }
-      .stat-card { min-width: 120px; }
-    }
-    </style>
+  </style>
 </head>
 <body>
-  <div class="container">
+  <main class="wrap">
     <header>
-      <div class="logo-container">
-        <h1 class="neon-text">Sleep Ring Converter</h1>
-        <div class="logo-rings">
-          <span class="ring"></span>
-          <span class="ring"></span>
-          <span class="ring"></span>
-        </div>
+      <div class="logo" aria-hidden="true">
+        <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+        <span class="zzz">z</span>
       </div>
-      <p class="subtitle">Transform SleepON 3 ring data to SleepHQ format instantly</p>
+      <h1>Sleep Ring Converter</h1>
+      <p class="subtitle">Turn your SleepON / Go2Sleep ring data into a SleepHQ-ready O2&nbsp;Ring file.</p>
+      <span class="privacy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linejoin="round"/></svg>
+        100% private — runs entirely in your browser, nothing is uploaded
+      </span>
+
+      <div class="stepper" id="stepper" style="margin-top:18px">
+        <div class="step active" data-step="1"><span class="dot">1</span><span class="name">Upload</span></div>
+        <span class="bar"></span>
+        <div class="step" data-step="2"><span class="dot">2</span><span class="name">Convert</span></div>
+        <span class="bar"></span>
+        <div class="step" data-step="3"><span class="dot">3</span><span class="name">Download</span></div>
+      </div>
     </header>
 
-    <main>
-      <section class="step-container" id="step1">
-        <div class="step-number">1</div>
-        <h2>Upload Your SleepON 3 File</h2>
-        <div class="upload-area" id="dropZone">
-          <div class="icon-container">
-            <i class="fas fa-file-csv upload-icon"></i>
-            <i class="fas fa-file-excel upload-icon"></i>
-          </div>
-          <p>Drop your SleepON CSV or Excel (.xlsx) file here</p>
-          <p class="small">or</p>
-          <div class="file-select-button" id="selectFileButton">Select File</div>
-          <input type="file" id="fileInput" accept=".csv,.xlsx" style="display:none;">
-          <p id="fileInfo"></p>
+    <!-- STEP 1 -->
+    <section class="card" id="card1">
+      <h2><span class="num">1</span> Add your sleep file</h2>
+      <p class="hint">Export from the SleepON app (CSV or Excel). Most files look like <code>RawData-Second-…​.xlsx</code> or a CSV with Time, SpO₂ and Pulse columns.</p>
+
+      <div class="dropzone" id="dropzone">
+        <svg class="cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M7 18a4 4 0 0 1 .3-8A6 6 0 0 1 19 9.5a3.5 3.5 0 0 1-.5 8.5H7z" stroke-linejoin="round"/>
+          <path d="M12 13v6M12 13l-2.4 2.4M12 13l2.4 2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Drag &amp; drop your file here</p>
+        <div class="or">or</div>
+
+        <label class="btn btn-primary btn-lg" for="fileInput" style="cursor:pointer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M12 4l-4 4M12 4l4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Choose file
+        </label>
+        <!-- A real <label for> + native input = reliable picker on iOS & Android (Files / iCloud / Drive) -->
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;" />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-block" id="sampleBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" stroke-linejoin="round"/></svg>
+          Try it with sample data
+        </button>
+      </div>
+
+      <div id="fileChip" class="file-chip hidden">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M14 3l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z" stroke-linejoin="round"/></svg></span>
+        <div class="meta"><div class="name" id="fileName">file.csv</div><div class="sz" id="fileSize">—</div></div>
+        <button class="rm" id="removeFile" type="button" aria-label="Remove file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="field" id="dateOrderField">
+        <label>Date order in your file <span style="color:var(--muted-2)">(leave on Auto unless dates look wrong)</span></label>
+        <div class="seg" id="dateOrderSeg">
+          <button class="on" data-order="auto" type="button">Auto</button>
+          <button data-order="dmy" type="button">Day / Month</button>
+          <button data-order="mdy" type="button">Month / Day</button>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="step-container hidden" id="step2">
-        <h2>Convert & Preview</h2>
-        <div class="action-area">
-          <button id="convertButton" class="action-button">
-            <i class="fas fa-sync-alt"></i> Convert Data
-          </button>
-          <div id="progressContainer" class="hidden">
-            <div class="progress-bar">
-              <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <p id="progressText">Converting...</p>
-          </div>
-        </div>
-      </section>
+    <!-- STEP 2 -->
+    <section class="card hidden" id="card2">
+      <h2><span class="num">2</span> Convert</h2>
+      <p class="hint">We’ll clean the data, keep the whole night (across midnight), and format it the way SleepHQ’s O2 Ring importer expects.</p>
+      <button class="btn btn-primary btn-lg btn-block" id="convertBtn" type="button" style="margin-top:16px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.7L4 16M4 20v-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Convert to SleepHQ format
+      </button>
+      <div class="progress hidden" id="progress">
+        <div class="track"><div class="fill" id="progressFill"></div></div>
+        <div class="label" id="progressLabel">Working…</div>
+      </div>
+    </section>
 
-      <section class="step-container hidden" id="step3">
-        <h2>Preview & Download</h2>
-        <div class="preview-area">
-          <div class="preview-container">
-            <div class="table-container" id="tableContainer"></div>
-            <div class="stats-container" id="statsContainer"></div>
-          </div>
+    <!-- STEP 3 -->
+    <section class="card hidden" id="card3">
+      <div class="success-burst" id="successBurst">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h2 style="justify-content:center"><span class="num">3</span> Your file is ready</h2>
+      <p class="hint" style="text-align:center" id="readySummary">—</p>
 
-          <a id="downloadButton" class="action-button">
-            <i class="fas fa-download"></i> Download SleepHQ-Ready File
-          </a>
-          <button id="newFileButton" class="secondary-button">
-            <i class="fas fa-redo-alt"></i> Convert Another File
-          </button>
-        </div>
-      </section>
-    </main>
+      <div class="stats" id="stats"></div>
 
-    <div id="errorPanel" class="error-panel hidden">
-      <button class="close-button" id="closeErrorBtn">&times;</button>
-      <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
-      <p id="errorMessage"></p>
-    </div>
+      <div class="table-wrap" id="tableWrap"></div>
+      <div class="table-note" id="tableNote"></div>
+
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" id="downloadBtn" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M12 16l-4-4M12 16l4-4M4 20h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download CSV
+        </a>
+        <button class="btn btn-ghost btn-lg" id="resetBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 1 2.3 5.6M4 12V7M4 12h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Convert another
+        </button>
+      </div>
+
+      <details class="disc" id="detailsDisc">
+        <summary>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Conversion details &amp; troubleshooting
+        </summary>
+        <div class="log" id="log"></div>
+      </details>
+
+      <details class="disc" id="howtoDisc">
+        <summary>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          How to upload to SleepHQ
+        </summary>
+        <div class="log" style="font-family:inherit;color:var(--muted)">1. Open SleepHQ and go to the day you want to add data to.
+2. Use the O2 Ring / oximeter import and select the CSV you just downloaded.
+3. The file is named with the recording start time (YYYYMMDDHHMMSS.csv) and uses the Wellue/Viatom O2 Ring column layout SleepHQ recognises.</div>
+      </details>
+    </section>
 
     <footer>
-      <p>Made with <span class="heart">♥</span> for better sleep tracking | &copy; 2023 Sleep Ring Converter</p>
+      <p>Made with <span class="heart">♥</span> for better sleep tracking · Works offline · No account needed</p>
     </footer>
+  </main>
+
+  <div class="toast" id="toast" role="alert">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="msg" id="toastMsg"></span>
+    <button class="x" id="toastClose" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
   </div>
 
   <script>
-    // Create app namespace
-    window.app = {};
-
-    document.addEventListener('DOMContentLoaded', function() {
-      // DOM Elements
-      const dropZone = document.getElementById('dropZone');
-      const fileInput = document.getElementById('fileInput');
-      const fileInfo = document.getElementById('fileInfo');
-      const convertButton = document.getElementById('convertButton');
-      const progressContainer = document.getElementById('progressContainer');
-      const progressFill = document.getElementById('progressFill');
-      const progressText = document.getElementById('progressText');
-      const tableContainer = document.getElementById('tableContainer');
-      const statsContainer = document.getElementById('statsContainer');
-      const downloadButton = document.getElementById('downloadButton');
-      const newFileButton = document.getElementById('newFileButton');
-      const step1 = document.getElementById('step1');
-      const step2 = document.getElementById('step2');
-      const step3 = document.getElementById('step3');
-
-      // Store current file and processed data
-      let currentFile = null;
-      let lastProcessedFile = null;
-      let convertedData = null;
-
-      // Event Listeners
-      dropZone.addEventListener('dragover', handleDragOver);
-      dropZone.addEventListener('dragleave', handleDragLeave);
-      dropZone.addEventListener('drop', handleDrop);
-      dropZone.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', handleFileSelect);
-      convertButton.addEventListener('click', handleConvert);
-      downloadButton.addEventListener('click', handleDownload);
-      newFileButton.addEventListener('click', resetToFileUpload);
-
-      function handleDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add('dragover');
-      }
-
-      function handleDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('dragover');
-      }
-
-      function handleDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('dragover');
-
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-          handleFile(files[0]);
-        }
-      }
-
-      function handleFileSelect(e) {
-        const files = e.target.files;
-        if (files.length > 0) {
-          handleFile(files[0]);
-        }
-      }
-
-      function handleFile(file) {
-        const fileExt = file.name.split('.').pop().toLowerCase();
-        if (fileExt !== 'csv' && fileExt !== 'xlsx') {
-          showError('Please select a CSV or Excel file.');
-          return;
-        }
-
-        // Accept any input filename
-        fileInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
-        currentFile = file;
-
-        step2.classList.remove('hidden');
-        step2.scrollIntoView({ behavior: 'smooth' });
-      }
-
-      function handleDownload(e) {
-        if (!convertedData || convertedData.length < 2) {
-          e.preventDefault();
-          showError('No data available for download.');
-          return;
-        }
-      }
-
-      function handleConvert() {
-        if (!currentFile) {
-          showError('Please select a file first.');
-          return;
-        }
-
-        if (lastProcessedFile === currentFile) {
-          step3.classList.remove('hidden');
-          step3.scrollIntoView({ behavior: 'smooth' });
-          return;
-        }
-
-        progressContainer.classList.remove('hidden');
-        convertButton.classList.add('hidden');
-        updateProgress(10, 'Reading file...');
-
-        const reader = new FileReader();
-
-        reader.onload = function(e) {
-          updateProgress(30, 'Parsing data...');
-          setTimeout(() => processFileData(e.target.result), 200);
-        };
-
-        reader.onerror = function() {
-          showError('Error reading file. Please try again.');
-          resetProgress();
-        };
-
-        if (currentFile.name.toLowerCase().endsWith('.xlsx')) {
-          reader.readAsArrayBuffer(currentFile);
-        } else {
-          reader.readAsText(currentFile);
-        }
-      }
-
-      function processFileData(result) {
-        try {
-          let data = [];
-          const isExcel = currentFile.name.toLowerCase().endsWith('.xlsx');
-
-          if (isExcel) {
-            updateProgress(40, 'Processing Excel data...');
-            const workbook = XLSX.read(result, { 
-              type: 'array',
-              cellDates: true,
-              dateNF: 'yyyy-mm-dd hh:mm:ss'
-            });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
-          } else {
-            updateProgress(40, 'Processing CSV data...');
-            data = parseCSV(result);
-          }
-
-          if (!data || data.length < 2) {
-            throw new Error('File is empty or has no data rows.');
-          }
-
-          updateProgress(60, 'Converting format...');
-
-          const convertedResult = convertToSleepHQ(data);
-          convertedData = convertedResult.data;
-
-          updateProgress(80, 'Generating preview...');
-
-          createPreviewTable(convertedData);
-          createStatsDisplay(convertedResult.stats);
-          prepareDownload();
-
-          lastProcessedFile = currentFile;
-
-          updateProgress(100, 'Completed!');
-          setTimeout(() => {
-            progressContainer.classList.add('hidden');
-            convertButton.classList.remove('hidden');
-            step3.classList.remove('hidden');
-            step3.scrollIntoView({ behavior: 'smooth' });
-          }, 500);
-        } catch (error) {
-          console.error('Processing error:', error);
-          showError(`Error processing file: ${error.message}`);
-          resetProgress();
-        }
-      }
-
-      function convertToSleepHQ(data) {
-        const headers = data[0].map(h => String(h).trim().toLowerCase());
-
-        const timeIdx = findColumnIndex(headers, ["time", "date", "datetime", "timestamp"]);
-        const spo2Idx = findColumnIndex(headers, ["oxygen", "o2", "spo2", "spo2%", "oxygen saturation", "oxygen level"]);
-        const prIdx = findColumnIndex(headers, ["heart", "pulse", "pr", "hr", "heart rate", "pulse rate"]);
-        const motionIdx = findColumnIndex(headers, ["active", "motion", "movement", "activity"]);
-
-        // Validate required columns
-        if (timeIdx === -1 || spo2Idx === -1 || prIdx === -1) {
-          throw new Error('Required columns not found. Please check your file format.');
-        }
-
-        // Ensure correct header format for SleepHQ
-        const outRows = [
-          ["Time", "Oxygen Level", "Pulse Rate", "Motion", "O2 Reminder", "PR Reminder"]
-        ];
-        const rowSet = new Set();
-        let validReadingsCount = 0;
-        let spo2Sum = 0;
-        let prSum = 0;
-
-        const stats = {
-          totalRows: data.length - 1,
-          validRows: 0,
-          invalidRows: 0,
-          duplicates: 0,
-          minSpo2: 100,
-          maxSpo2: 0,
-          avgSpo2: 0,
-          minPR: 300,
-          maxPR: 0,
-          avgPR: 0,
-          spo2Sum: 0,
-          prSum: 0
-        };
-
-        // Get the first valid date to ensure we're only processing one day
-        let firstDate = null;
-        for (let i = 1; i < data.length; i++) {
-          const row = data[i];
-          if (!row || row.length < timeIdx + 1) continue;
-          
-          const rawTime = row[timeIdx];
-          if (!rawTime) continue;
-          
-          try {
-            const dt = parseDateTime(rawTime);
-            if (dt && !isNaN(dt.getTime())) {
-              firstDate = dt;
-              break;
-            }
-          } catch (error) {
-            continue;
-          }
-        }
-
-        if (!firstDate) {
-          throw new Error('No valid dates found in the data.');
-        }
-
-        // Group readings by minute
-        const readingsByMinute = new Map();
-
-        // Process each data row
-        for (let i = 1; i < data.length; i++) {
-          const row = data[i];
-          if (!row || row.length < Math.max(timeIdx, spo2Idx, prIdx) + 1) {
-            stats.invalidRows++;
-            continue;
-          }
-
-          const rawTime = row[timeIdx];
-          if (!rawTime) {
-            stats.invalidRows++;
-            continue;
-          }
-
-          let dt;
-          try {
-            dt = parseDateTime(rawTime);
-            if (!dt || isNaN(dt.getTime())) {
-              stats.invalidRows++;
-              continue;
-            }
-
-            // Skip rows from different days
-            if (dt.getDate() !== firstDate.getDate() || 
-                dt.getMonth() !== firstDate.getMonth() || 
-                dt.getFullYear() !== firstDate.getFullYear()) {
-              continue;
-            }
-          } catch (error) {
-            console.error("Date parsing error:", error, rawTime);
-            stats.invalidRows++;
-            continue;
-          }
-
-          // Format time exactly as in the working example: DD/MM/YYYY HH:mm:ss
-          const day = dt.getDate().toString().padStart(2, '0');
-          const month = (dt.getMonth() + 1).toString().padStart(2, '0');
-          const year = dt.getFullYear();
-          const hours = dt.getHours().toString().padStart(2, '0');
-          const minutes = dt.getMinutes().toString().padStart(2, '0');
-          const seconds = dt.getSeconds().toString().padStart(2, '0');
-          const fmtTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
-
-          // Parse SpO2 and PR values
-          let spo2Val = Number(row[spo2Idx]);
-          let prVal = Number(row[prIdx]);
-
-          // Replace any non-numeric or invalid values with 0
-          if (isNaN(spo2Val) || spo2Val < 70 || spo2Val > 100) {
-            spo2Val = 0;
-          }
-
-          if (isNaN(prVal) || prVal < 40 || prVal > 200) {
-            prVal = 0;
-          }
-
-          const spo2 = Math.round(spo2Val);
-          const pr = Math.round(prVal);
-
-          // Only count valid readings for stats
-          if (spo2 > 0 && pr > 0) {
-            stats.validRows++;
-            stats.spo2Sum += spo2;
-            stats.prSum += pr;
-
-            if (spo2 < stats.minSpo2 || stats.minSpo2 === 0) stats.minSpo2 = spo2;
-            if (spo2 > stats.maxSpo2) stats.maxSpo2 = spo2;
-
-            if (pr < stats.minPR || stats.minPR === 0) stats.minPR = pr;
-            if (pr > stats.maxPR) stats.maxPR = pr;
-          } else {
-            stats.invalidRows++;
-            continue;
-          }
-
-          // Handle motion values exactly as in the working example (0 or raw value)
-          let motion = 0;
-          if (motionIdx !== -1 && row[motionIdx]) {
-            motion = Number(row[motionIdx]);
-          }
-
-          // Group readings by minute
-          const minuteKey = fmtTime;
-          if (!readingsByMinute.has(minuteKey)) {
-            readingsByMinute.set(minuteKey, []);
-          }
-          readingsByMinute.get(minuteKey).push({
-            time: fmtTime,
-            spo2: spo2,
-            pr: pr,
-            motion: motion
-          });
-        }
-
-        // Process grouped readings
-        for (const [minuteKey, readings] of readingsByMinute) {
-          // Sort readings by motion (8 first, then 5, then 0)
-          readings.sort((a, b) => b.motion - a.motion);
-          
-          // Add all readings for this minute
-          for (const reading of readings) {
-            const outputRow = [
-              reading.time,
-              reading.spo2.toString(),
-              reading.pr.toString(),
-              reading.motion.toString(),
-              "0",
-              "0"
-            ];
-            const lineKey = outputRow.join(',');
-            
-            if (!rowSet.has(lineKey)) {
-              rowSet.add(lineKey);
-              outRows.push(outputRow);
-            } else {
-              stats.duplicates++;
-            }
-          }
-        }
-
-        // Calculate averages only if we have valid readings
-        if (stats.validRows > 0) {
-          stats.avgSpo2 = Math.round(stats.spo2Sum / stats.validRows);
-          stats.avgPR = Math.round(stats.prSum / stats.validRows);
-        }
-
-        // Ensure all numeric values are valid
-        if (stats.minSpo2 === 100) stats.minSpo2 = 0;
-        if (stats.maxSpo2 === 0) stats.maxSpo2 = 0;
-        if (stats.minPR === 300) stats.minPR = 0;
-        if (stats.maxPR === 0) stats.maxPR = 0;
-
-        return {
-          data: outRows,
-          stats: stats
-        };
-      }
-
-      function parseCSV(csvText) {
-        const lines = csvText.split(/\r?\n/);
-        const result = [];
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-
-          const row = [];
-          let inQuotes = false;
-          let currentValue = "";
-
-          for (let j = 0; j < line.length; j++) {
-            const char = line[j];
-
-            if (char === '"' && (j === 0 || line[j-1] !== '\\')) {
-              inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-              row.push(currentValue);
-              currentValue = "";
-            } else {
-              currentValue += char;
-            }
-          }
-
-          row.push(currentValue);
-          result.push(row);
-        }
-
-        return result;
-      }
-
-      function parseDateTime(rawTime) {
-        if (typeof rawTime === 'number') {
-          return new Date(XLSX.SSF.parse_date_code(rawTime));
-        } else if (rawTime instanceof Date) {
-          return rawTime;
-        }
-
-        let timeStr = String(rawTime).trim();
-
-        if (/\b(am|pm)\b/i.test(timeStr)) {
-          const match = timeStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2})(?::(\d{2}))? ?([ap]m)/i);
-          if (match) {
-            const [_, month, day, year, hours, minutes, seconds, ampm] = match;
-            let hour = parseInt(hours);
-
-            if (ampm.toLowerCase() === 'pm' && hour < 12) hour += 12;
-            if (ampm.toLowerCase() === 'am' && hour === 12) hour = 0;
-
-            timeStr = `${day}/${month}/${year} ${hour.toString().padStart(2, '0')}:${minutes}`;
-          }
-        }
-
-        let dt = new Date(timeStr);
-
-        if (isNaN(dt.getTime())) {
-          const parts = timeStr.split(' ')[0].split('/');
-          if (parts.length === 3) {
-            timeStr = `${parts[1]}/${parts[0]}/${parts[2]} ${timeStr.split(' ')[1] || ''}`.trim();
-            dt = new Date(timeStr);
-          }
-
-          if (isNaN(dt.getTime())) {
-            const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-            if (match) {
-              const [_, year, month, day, hours, minutes, seconds] = match;
-              dt = new Date(
-                parseInt(year),
-                parseInt(month) - 1,
-                parseInt(day),
-                parseInt(hours || '0'),
-                parseInt(minutes || '0'),
-                parseInt(seconds || '0')
-              );
-            }
-          }
-        }
-
-        return dt;
-      }
-
-      function formatDateTime(dt) {
-        return `${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getFullYear()} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
-      }
-
-      function findColumnIndex(headers, possibleNames) {
-        for (const name of possibleNames) {
-          const index = headers.findIndex(h => h.includes(name));
-          if (index !== -1) return index;
-        }
-        return -1;
-      }
-
-      function createPreviewTable(data) {
-        if (!data || data.length < 2) {
-          tableContainer.innerHTML = '<p>No valid data found.</p>';
-          return;
-        }
-
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        const tbody = document.createElement('tbody');
-
-        const headerRow = document.createElement('tr');
-        data[0].forEach(header => {
-          const th = document.createElement('th');
-          th.textContent = header;
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-
-        const maxRows = Math.min(10, data.length - 1);
-        for (let i = 1; i <= maxRows; i++) {
-          const tr = document.createElement('tr');
-          data[i].forEach(cell => {
-            const td = document.createElement('td');
-            td.textContent = cell;
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        }
-
-        table.appendChild(thead);
-        table.appendChild(tbody);
-        tableContainer.innerHTML = '';
-        tableContainer.appendChild(table);
-
-        if (data.length - 1 > maxRows) {
-          const noteDiv = document.createElement('div');
-          noteDiv.className = 'small';
-          noteDiv.style.marginTop = '1rem';
-          noteDiv.textContent = `Showing ${maxRows} of ${data.length - 1} rows. Download to see all data.`;
-          tableContainer.appendChild(noteDiv);
-        }
-      }
-
-      function createStatsDisplay(stats) {
-        statsContainer.innerHTML = '';
-
-        const statsData = [
-          { label: 'Valid Readings', value: stats.validRows.toLocaleString() },
-          { label: 'Avg SpO2', value: stats.avgSpo2 + '%' },
-          { label: 'Min SpO2', value: stats.minSpo2 + '%' },
-          { label: 'Max SpO2', value: stats.maxSpo2 + '%' },
-          { label: 'Avg Pulse Rate', value: stats.avgPR + ' BPM' },
-          { label: 'Min Pulse Rate', value: stats.minPR + ' BPM' },
-          { label: 'Max Pulse Rate', value: stats.maxPR + ' BPM' },
-          { label: 'Duplicates Removed', value: stats.duplicates.toLocaleString() }
-        ];
-
-        statsData.forEach(stat => {
-          const statCard = document.createElement('div');
-          statCard.className = 'stat-card';
-
-          const statValue = document.createElement('div');
-          statValue.className = 'stat-number';
-          statValue.textContent = stat.value;
-
-          const statLabel = document.createElement('div');
-          statLabel.className = 'stat-label';
-          statLabel.textContent = stat.label;
-
-          statCard.appendChild(statValue);
-          statCard.appendChild(statLabel);
-          statsContainer.appendChild(statCard);
-        });
-      }
-
-      function prepareDownload() {
-        if (!convertedData || convertedData.length < 2) {
-          return;
-        }
-
-        // Extract timestamp from input filename (e.g., RawData-Second-UserId(3709)-20250506213317O09fcwzW.xlsx -> 20250506213317)
-        let filename;
-        console.log('Original filename:', currentFile.name);
-        
-        // Updated regex to match the exact format: YYYYMMDDHHMMSS followed by optional characters
-        const timestampMatch = currentFile.name.match(/(\d{14})[^.]*/);
-        console.log('Timestamp match:', timestampMatch);
-        
-        if (timestampMatch && timestampMatch[1]) {
-            filename = timestampMatch[1];  // Keep only the 14-digit timestamp
-            console.log('Extracted filename:', filename);
-        } else {
-            // If no timestamp in filename, try to get it from the first data row
-            try {
-                const firstRow = convertedData[1][0]; // Get the time from first data row
-                console.log('First row time:', firstRow);
-                const dt = parseDateTime(firstRow);
-                if (dt && !isNaN(dt.getTime())) {
-                    const year = dt.getFullYear();
-                    const month = (dt.getMonth() + 1).toString().padStart(2, '0');
-                    const day = dt.getDate().toString().padStart(2, '0');
-                    const hours = dt.getHours().toString().padStart(2, '0');
-                    const minutes = dt.getMinutes().toString().padStart(2, '0');
-                    const seconds = dt.getSeconds().toString().padStart(2, '0');
-                    filename = `${year}${month}${day}${hours}${minutes}${seconds}`;
-                    console.log('Generated filename from date:', filename);
-                } else {
-                    // Fallback to current timestamp if no valid date found
-                    const now = new Date();
-                    filename = now.getFullYear() +
-                        (now.getMonth() + 1).toString().padStart(2, '0') +
-                        now.getDate().toString().padStart(2, '0') +
-                        now.getHours().toString().padStart(2, '0') +
-                        now.getMinutes().toString().padStart(2, '0') +
-                        now.getSeconds().toString().padStart(2, '0');
-                    console.log('Fallback filename:', filename);
-                }
-            } catch (error) {
-                console.error('Error generating filename:', error);
-                // Fallback to current timestamp if any error occurs
-                const now = new Date();
-                filename = now.getFullYear() +
-                    (now.getMonth() + 1).toString().padStart(2, '0') +
-                    now.getDate().toString().padStart(2, '0') +
-                    now.getHours().toString().padStart(2, '0') +
-                    now.getMinutes().toString().padStart(2, '0') +
-                    now.getSeconds().toString().padStart(2, '0');
-                console.log('Error fallback filename:', filename);
-            }
-        }
-
-        // Create CSV content exactly matching the working example format
-        const csvContent = convertedData.map(row => row.join(',')).join('\n') + '\n';
-        
-        // Create blob with explicit UTF-8 encoding but NO BOM
-        const blob = new Blob([csvContent], { 
-            type: 'text/csv'
-        });
-
-        // Clean up any existing object URL
-        if (downloadButton.href) {
-            URL.revokeObjectURL(downloadButton.href);
-        }
-
-        // Create new object URL and set download attributes
-        const url = URL.createObjectURL(blob);
-
-        downloadButton.href = url;
-        downloadButton.download = filename + '.csv';  // Use lowercase .csv extension
-        console.log('Final download filename:', downloadButton.download);
-        downloadButton.classList.remove('hidden');
-      }
-
-      function resetToFileUpload() {
-        fileInput.value = '';
-        fileInfo.textContent = '';
-        tableContainer.innerHTML = '';
-        statsContainer.innerHTML = '';
-        step2.classList.add('hidden');
-        step3.classList.add('hidden');
-        progressContainer.classList.add('hidden');
-        convertButton.classList.remove('hidden');
-        currentFile = null;
-
-        step1.scrollIntoView({ behavior: 'smooth' });
-      }
-
-      function updateProgress(percent, message) {
-        progressFill.style.width = `${percent}%`;
-        progressText.textContent = message;
-      }
-
-      function resetProgress() {
-        progressContainer.classList.add('hidden');
-        convertButton.classList.remove('hidden');
-        updateProgress(0, '');
-      }
-
-      function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' bytes';
-        else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-        else return (bytes / 1048576).toFixed(1) + ' MB';
-      }
-
-      function showError(message) {
-        document.getElementById('errorMessage').textContent = message;
-        document.getElementById('errorPanel').classList.remove('hidden');
-      }
-      document.getElementById('closeErrorBtn').addEventListener('click', () => {
-        document.getElementById('errorPanel').classList.add('hidden');
-      });
+  (function () {
+    "use strict";
+
+    /* ============================================================
+       Output spec (Wellue / Viatom O2 Ring CSV — accepted by SleepHQ)
+       Header:  Time,Oxygen Level,Pulse Rate,Motion,O2 Reminder,PR Reminder
+       Time:    DD/MM/YYYY HH:mm:ss   (seconds kept — data is sub-minute)
+       ============================================================ */
+    var OUT_HEADER = ["Time", "Oxygen Level", "Pulse Rate", "Motion", "O2 Reminder", "PR Reminder"];
+
+    // ---- Validity ranges -------------------------------------------------
+    var SPO2_MIN = 50, SPO2_MAX = 100;     // physiological + sensor sanity
+    var PR_MIN = 25,  PR_MAX = 250;
+
+    // ---- DOM -------------------------------------------------------------
+    var $ = function (id) { return document.getElementById(id); };
+    var dropzone = $("dropzone"), fileInput = $("fileInput"), sampleBtn = $("sampleBtn");
+    var fileChip = $("fileChip"), fileName = $("fileName"), fileSize = $("fileSize"), removeFile = $("removeFile");
+    var card1 = $("card1"), card2 = $("card2"), card3 = $("card3");
+    var convertBtn = $("convertBtn"), progress = $("progress"), progressFill = $("progressFill"), progressLabel = $("progressLabel");
+    var statsEl = $("stats"), tableWrap = $("tableWrap"), tableNote = $("tableNote");
+    var downloadBtn = $("downloadBtn"), resetBtn = $("resetBtn"), logEl = $("log"), readySummary = $("readySummary");
+    var stepper = $("stepper"), toast = $("toast"), toastMsg = $("toastMsg"), toastClose = $("toastClose");
+    var dateOrderSeg = $("dateOrderSeg");
+
+    // ---- State -----------------------------------------------------------
+    var state = { file: null, sample: null, dateOrder: "auto", csvText: null, csvName: null, logLines: [] };
+
+    // ====================================================================
+    //  Wiring
+    // ====================================================================
+    ["dragenter", "dragover"].forEach(function (ev) {
+      dropzone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dropzone.classList.add("drag"); });
     });
+    ["dragleave", "dragend", "drop"].forEach(function (ev) {
+      dropzone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dropzone.classList.remove("drag"); });
+    });
+    dropzone.addEventListener("drop", function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) acceptFile(f);
+    });
+    fileInput.addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (f) acceptFile(f);
+    });
+    removeFile.addEventListener("click", clearFile);
+    sampleBtn.addEventListener("click", useSample);
+    convertBtn.addEventListener("click", runConvert);
+    resetBtn.addEventListener("click", resetAll);
+    toastClose.addEventListener("click", hideToast);
+    dateOrderSeg.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      Array.prototype.forEach.call(dateOrderSeg.children, function (c) { c.classList.remove("on"); });
+      b.classList.add("on");
+      state.dateOrder = b.getAttribute("data-order");
+    });
+
+    // ====================================================================
+    //  File handling
+    // ====================================================================
+    function acceptFile(file) {
+      var ext = (file.name.split(".").pop() || "").toLowerCase();
+      if (["csv", "xlsx", "xls", "txt"].indexOf(ext) === -1) {
+        showToast("Please choose a CSV or Excel (.xlsx) file.");
+        return;
+      }
+      state.file = file; state.sample = null;
+      fileName.textContent = file.name;
+      fileSize.textContent = humanSize(file.size);
+      fileChip.classList.remove("hidden");
+      card2.classList.remove("hidden");
+      setStep(2);
+      card2.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function useSample() {
+      state.sample = buildSample();
+      state.file = null;
+      fileName.textContent = "sample-sleepon-night.csv";
+      fileSize.textContent = humanSize(state.sample.length);
+      fileChip.classList.remove("hidden");
+      card2.classList.remove("hidden");
+      setStep(2);
+      card2.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function clearFile() {
+      state.file = null; state.sample = null; fileInput.value = "";
+      fileChip.classList.add("hidden");
+      card2.classList.add("hidden"); card3.classList.add("hidden");
+      progress.classList.add("hidden");
+      setStep(1);
+    }
+
+    // ====================================================================
+    //  Convert pipeline
+    // ====================================================================
+    function runConvert() {
+      if (!state.file && !state.sample) { showToast("Add a file first."); return; }
+      state.logLines = [];
+      convertBtn.disabled = true;
+      progress.classList.remove("hidden");
+      setProgress(8, "Reading file…");
+
+      readInput()
+        .then(function (matrix) {
+          setProgress(35, "Detecting columns…");
+          return delay(120).then(function () { return matrix; });
+        })
+        .then(function (matrix) {
+          var readings = interpret(matrix);
+          setProgress(70, "Formatting for SleepHQ…");
+          return delay(120).then(function () { return readings; });
+        })
+        .then(function (readings) {
+          var result = buildOutput(readings);
+          setProgress(92, "Building preview…");
+          renderResult(result);
+          setProgress(100, "Done!");
+          return delay(380);
+        })
+        .then(function () {
+          progress.classList.add("hidden");
+          convertBtn.disabled = false;
+          card3.classList.remove("hidden");
+          setStep(3, true);
+          card3.scrollIntoView({ behavior: "smooth", block: "start" });
+        })
+        .catch(function (err) {
+          console.error(err);
+          progress.classList.add("hidden");
+          convertBtn.disabled = false;
+          showToast(err.message || "Something went wrong while converting.");
+          // Still surface the log so the user can tell us what their file looks like.
+          if (state.logLines.length) {
+            card3.classList.remove("hidden");
+            statsEl.innerHTML = ""; tableWrap.innerHTML = ""; tableNote.textContent = "";
+            $("successBurst").classList.add("hidden");
+            readySummary.textContent = "Conversion failed — see details below.";
+            downloadBtn.classList.add("hidden");
+            $("detailsDisc").open = true;
+            renderLog();
+            setStep(3);
+            card3.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+    }
+
+    // --- Read file into a 2D matrix of raw cell values --------------------
+    function readInput() {
+      return new Promise(function (resolve, reject) {
+        if (state.sample) {
+          log("Source: built-in sample data");
+          resolve(parseDelimited(state.sample));
+          return;
+        }
+        var file = state.file;
+        var isExcel = /\.(xlsx|xls)$/i.test(file.name);
+        var reader = new FileReader();
+        reader.onerror = function () { reject(new Error("Couldn’t read that file. Try re-exporting it.")); };
+        reader.onload = function (e) {
+          try {
+            if (isExcel) {
+              if (typeof XLSX === "undefined") throw new Error("Excel support is still loading — please wait a second and try again.");
+              log("Source: Excel workbook (" + file.name + ")");
+              var wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: true });
+              var sheetName = wb.SheetNames[0];
+              log("Sheet: " + sheetName + (wb.SheetNames.length > 1 ? " (of " + wb.SheetNames.length + ")" : ""));
+              var sheet = wb.Sheets[sheetName];
+              resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, blankrows: false, defval: "" }));
+            } else {
+              log("Source: text/CSV (" + file.name + ")");
+              resolve(parseDelimited(String(e.target.result)));
+            }
+          } catch (err) { reject(err); }
+        };
+        if (isExcel) reader.readAsArrayBuffer(file); else reader.readAsText(file);
+      });
+    }
+
+    // --- Robust delimited parser (CSV / TSV / semicolon), RFC-4180 quotes -
+    function parseDelimited(text) {
+      // strip BOM
+      text = text.replace(/^﻿/, "");
+      // pick delimiter from the first non-empty line
+      var firstLine = (text.split(/\r?\n/).find(function (l) { return l.trim() !== ""; })) || "";
+      var counts = { ",": (firstLine.match(/,/g) || []).length,
+                     ";": (firstLine.match(/;/g) || []).length,
+                     "\t": (firstLine.match(/\t/g) || []).length };
+      var delim = ",";
+      if (counts[";"] > counts[delim]) delim = ";";
+      if (counts["\t"] > counts[delim]) delim = "\t";
+      log("Delimiter: " + (delim === "\t" ? "TAB" : delim));
+
+      var rows = [], row = [], cur = "", inQ = false;
+      for (var i = 0; i < text.length; i++) {
+        var c = text[i];
+        if (inQ) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { cur += '"'; i++; }
+            else inQ = false;
+          } else cur += c;
+        } else if (c === '"') {
+          inQ = true;
+        } else if (c === delim) {
+          row.push(cur); cur = "";
+        } else if (c === "\n" || c === "\r") {
+          if (c === "\r" && text[i + 1] === "\n") i++;
+          row.push(cur); rows.push(row); row = []; cur = "";
+        } else cur += c;
+      }
+      if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+      // drop fully-empty rows
+      return rows.filter(function (r) { return r.some(function (v) { return String(v).trim() !== ""; }); });
+    }
+
+    // ====================================================================
+    //  Interpret matrix -> readings [{ t: Date, spo2, pr, motion }]
+    // ====================================================================
+    function interpret(matrix) {
+      if (!matrix || matrix.length === 0) throw new Error("The file appears to be empty.");
+
+      // 1) Locate the header row (SleepON exports sometimes have title/blank rows on top).
+      var headerInfo = findHeaderRow(matrix);
+      var headerRow = headerInfo.row;
+      var headers = matrix[headerRow].map(function (h) { return String(h == null ? "" : h).trim(); });
+      var lower = headers.map(function (h) { return h.toLowerCase(); });
+      log("Header row: #" + (headerRow + 1));
+      log("Columns found: " + headers.filter(Boolean).map(function (h) { return '"' + h + '"'; }).join(", "));
+
+      // 2) Map columns by fuzzy aliases.
+      var idx = {
+        time:   matchCol(lower, ["time", "date", "datetime", "date time", "timestamp", "starttime", "start time", "recordtime"]),
+        spo2:   matchCol(lower, ["oxygen level", "oxygen", "spo2", "spo₂", "o2", "sao2", "blood oxygen", "saturation", "spo2raw", "spo2(%)", "oxygen saturation"]),
+        pr:     matchCol(lower, ["pulse rate", "pulse", "heart rate", "heartrate", "pr", "hr", "bpm", "heart", "heartraw", "pulse(bpm)"]),
+        motion: matchCol(lower, ["motion", "movement", "active", "activity", "move", "bodymotion"])
+      };
+      log("Mapped → time:" + colName(headers, idx.time) + "  spo2:" + colName(headers, idx.spo2) +
+          "  pulse:" + colName(headers, idx.pr) + "  motion:" + colName(headers, idx.motion));
+
+      var dataRows = matrix.slice(headerRow + 1);
+
+      // 3) Detect the "packed raw array" SleepON format (spo2Raw/heartRaw cells hold many values).
+      var packed = detectPacked(dataRows, idx);
+      var readings;
+      if (packed) {
+        log("Detected packed SleepON format (per-row sample arrays). Expanding…");
+        readings = expandPacked(dataRows, idx, headerInfo);
+      } else {
+        if (idx.time === -1 || idx.spo2 === -1 || idx.pr === -1) {
+          throw new Error("Couldn’t find the Time, SpO₂ and Pulse columns. Open “Conversion details” to see what columns were detected, then pick the right export or tell us the headers.");
+        }
+        readings = expandFlat(dataRows, idx);
+      }
+
+      if (!readings.length) {
+        throw new Error("No valid SpO₂/pulse readings were found. Open “Conversion details” to see why rows were skipped.");
+      }
+      return readings;
+    }
+
+    function findHeaderRow(matrix) {
+      var best = { row: 0, score: -1 };
+      var limit = Math.min(matrix.length, 25);
+      for (var r = 0; r < limit; r++) {
+        var cells = matrix[r].map(function (c) { return String(c == null ? "" : c).trim().toLowerCase(); });
+        var score = 0;
+        ["time", "date", "spo2", "oxygen", "pulse", "heart", "pr", "hr", "motion", "spo2raw", "heartraw", "starttime"].forEach(function (k) {
+          if (cells.some(function (c) { return c.indexOf(k) !== -1; })) score++;
+        });
+        // header rows are mostly text, not numbers
+        var numeric = cells.filter(function (c) { return c !== "" && isFinite(c.replace(",", ".")); }).length;
+        if (numeric > cells.length / 2) score -= 2;
+        if (score > best.score) best = { row: r, score: score };
+      }
+      return best;
+    }
+
+    function matchCol(lowerHeaders, aliases) {
+      // exact first
+      for (var a = 0; a < aliases.length; a++) {
+        var i = lowerHeaders.indexOf(aliases[a]);
+        if (i !== -1) return i;
+      }
+      // contains
+      for (var b = 0; b < aliases.length; b++) {
+        for (var h = 0; h < lowerHeaders.length; h++) {
+          if (lowerHeaders[h] && lowerHeaders[h].indexOf(aliases[b]) !== -1) return h;
+        }
+      }
+      return -1;
+    }
+    function colName(headers, i) { return i === -1 ? "(none)" : '"' + headers[i] + '"'; }
+
+    function detectPacked(dataRows, idx) {
+      if (idx.spo2 === -1 && idx.pr === -1) return false;
+      var col = idx.spo2 !== -1 ? idx.spo2 : idx.pr;
+      var checked = 0, packedHits = 0;
+      for (var i = 0; i < dataRows.length && checked < 8; i++) {
+        var v = dataRows[i][col];
+        if (v == null || String(v).trim() === "") continue;
+        checked++;
+        var parts = String(v).split(/[,;| ]+/).filter(Boolean);
+        if (parts.length >= 4 && parts.every(function (p) { return isFinite(p); })) packedHits++;
+      }
+      return checked > 0 && packedHits >= Math.max(1, Math.ceil(checked / 2));
+    }
+
+    // --- Flat: one reading per row ---------------------------------------
+    function expandFlat(dataRows, idx) {
+      var timeStrings = dataRows.map(function (r) { return r[idx.time]; });
+      var dayFirst = resolveDayFirst(timeStrings);
+      var out = [];
+      var skippedTime = 0, skippedVals = 0;
+      for (var i = 0; i < dataRows.length; i++) {
+        var r = dataRows[i];
+        var t = parseDate(r[idx.time], dayFirst);
+        if (!t) { skippedTime++; continue; }
+        var spo2 = sanitizeSpo2(num(r[idx.spo2]));
+        var pr = sanitizePr(num(r[idx.pr]));
+        if (spo2 == null || pr == null) { skippedVals++; continue; }
+        var motion = idx.motion !== -1 ? Math.max(0, Math.round(num(r[idx.motion])) || 0) : 0;
+        out.push({ t: t, spo2: spo2, pr: pr, motion: motion });
+      }
+      log("Flat rows → kept " + out.length + ", skipped " + skippedTime + " (bad/no time), " + skippedVals + " (out-of-range SpO₂/pulse)");
+      return out;
+    }
+
+    // --- Packed: each row has arrays of samples between start & end -------
+    function expandPacked(dataRows, idx, headerInfo) {
+      var headers = headerInfo.lower || [];
+      // try to find an end-time column for interval sizing
+      var endIdx = matchCol(headers, ["endtime", "end time", "stoptime", "end"]);
+      var out = [], rowsUsed = 0;
+      var dayFirst = resolveDayFirst(dataRows.map(function (r) { return r[idx.time]; }));
+      for (var i = 0; i < dataRows.length; i++) {
+        var r = dataRows[i];
+        var start = parseDate(r[idx.time], dayFirst);
+        if (!start) continue;
+        var spo2Arr = idx.spo2 !== -1 ? splitNums(r[idx.spo2]) : [];
+        var prArr   = idx.pr   !== -1 ? splitNums(r[idx.pr])   : [];
+        var n = Math.max(spo2Arr.length, prArr.length);
+        if (n === 0) continue;
+        var end = endIdx !== -1 ? parseDate(r[endIdx], dayFirst) : null;
+        var stepMs = end ? Math.max(1000, (end.getTime() - start.getTime()) / n) : 1000; // default 1s
+        rowsUsed++;
+        for (var k = 0; k < n; k++) {
+          var spo2 = sanitizeSpo2(spo2Arr.length ? spo2Arr[k] : NaN);
+          var pr = sanitizePr(prArr.length ? prArr[k] : NaN);
+          if (spo2 == null || pr == null) continue;
+          out.push({ t: new Date(start.getTime() + k * stepMs), spo2: spo2, pr: pr, motion: 0 });
+        }
+      }
+      log("Packed rows used: " + rowsUsed + " → expanded to " + out.length + " readings");
+      return out;
+    }
+
+    function splitNums(v) {
+      if (v == null) return [];
+      return String(v).split(/[,;| ]+/).filter(function (x) { return x !== ""; }).map(Number).filter(function (x) { return isFinite(x); });
+    }
+
+    // ====================================================================
+    //  Value + date helpers
+    // ====================================================================
+    function num(v) {
+      if (typeof v === "number") return v;
+      if (v == null) return NaN;
+      var s = String(v).trim().replace("%", "").replace(/,/g, ".");
+      return parseFloat(s);
+    }
+    function sanitizeSpo2(v) { return (isFinite(v) && v >= SPO2_MIN && v <= SPO2_MAX) ? Math.round(v) : null; }
+    function sanitizePr(v)   { return (isFinite(v) && v >= PR_MIN  && v <= PR_MAX)  ? Math.round(v) : null; }
+
+    // Decide day-first vs month-first across the whole time column.
+    function resolveDayFirst(values) {
+      if (state.dateOrder === "dmy") { log("Date order: forced Day/Month"); return true; }
+      if (state.dateOrder === "mdy") { log("Date order: forced Month/Day"); return false; }
+      var dayWins = 0, monthWins = 0;
+      for (var i = 0; i < values.length; i++) {
+        var s = values[i]; if (typeof s !== "string") continue;
+        var m = s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+        if (!m) continue;
+        var a = +m[1], b = +m[2];
+        if (a > 12 && b <= 12) dayWins++;
+        else if (b > 12 && a <= 12) monthWins++;
+      }
+      var dayFirst = monthWins > dayWins ? false : true; // default to day-first (SleepON/international)
+      log("Date order: auto → " + (dayFirst ? "Day/Month" : "Month/Day") + " (D:" + dayWins + " M:" + monthWins + ")");
+      return dayFirst;
+    }
+
+    function parseDate(v, dayFirst) {
+      if (v == null || v === "") return null;
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+
+      if (typeof v === "number" || /^\d+(\.\d+)?$/.test(String(v).trim())) {
+        var n = typeof v === "number" ? v : parseFloat(v);
+        // Excel serial date (days since 1899-12-30); typical range ~ 1..80000
+        if (n > 59 && n < 100000) {
+          if (typeof XLSX !== "undefined" && XLSX.SSF && XLSX.SSF.parse_date_code) {
+            var d = XLSX.SSF.parse_date_code(n);
+            if (d) return new Date(d.y, d.m - 1, d.d, d.H, d.M, Math.floor(d.S));
+          }
+          return new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+        }
+        // epoch seconds / milliseconds
+        if (n > 1e12) return new Date(n);
+        if (n > 1e9)  return new Date(n * 1000);
+      }
+
+      var s = String(v).trim();
+
+      // ISO-ish: 2025-03-28 23:52:10  or with T
+      var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+      if (iso) {
+        return new Date(+iso[1], +iso[2] - 1, +iso[3], +(iso[4] || 0), +(iso[5] || 0), +(iso[6] || 0));
+      }
+
+      // D/M/Y or M/D/Y with optional time and AM/PM
+      var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*([ap]\.?m\.?)?/i);
+      if (m) {
+        var p1 = +m[1], p2 = +m[2], yr = +m[3];
+        if (yr < 100) yr += 2000;
+        var day = dayFirst ? p1 : p2;
+        var mon = dayFirst ? p2 : p1;
+        if (mon > 12 && day <= 12) { var tmp = day; day = mon; mon = tmp; } // self-correct impossible months
+        var hr = +(m[4] || 0), mi = +(m[5] || 0), se = +(m[6] || 0);
+        if (m[7]) {
+          var pm = /p/i.test(m[7]);
+          if (pm && hr < 12) hr += 12;
+          if (!pm && hr === 12) hr = 0;
+        }
+        return new Date(yr, mon - 1, day, hr, mi, se);
+      }
+
+      // last resort: native parser
+      var d2 = new Date(s);
+      return isNaN(d2.getTime()) ? null : d2;
+    }
+
+    // ====================================================================
+    //  Build output (sorted, de-duplicated, full night)
+    // ====================================================================
+    function buildOutput(readings) {
+      readings.sort(function (a, b) { return a.t - b.t; });
+
+      var rows = [OUT_HEADER.slice()];
+      var seen = Object.create(null);
+      var dupes = 0;
+      var sumS = 0, sumP = 0, minS = 100, maxS = 0, minP = 999, maxP = 0;
+
+      for (var i = 0; i < readings.length; i++) {
+        var rd = readings[i];
+        var time = fmtTime(rd.t);
+        if (seen[time]) { dupes++; continue; }   // one reading per second
+        seen[time] = 1;
+        rows.push([time, String(rd.spo2), String(rd.pr), String(rd.motion), "0", "0"]);
+        sumS += rd.spo2; sumP += rd.pr;
+        if (rd.spo2 < minS) minS = rd.spo2; if (rd.spo2 > maxS) maxS = rd.spo2;
+        if (rd.pr < minP) minP = rd.pr; if (rd.pr > maxP) maxP = rd.pr;
+      }
+
+      var valid = rows.length - 1;
+      var first = readings[0].t, last = readings[readings.length - 1].t;
+      var stats = {
+        valid: valid, dupes: dupes,
+        avgS: Math.round(sumS / valid), minS: minS, maxS: maxS,
+        avgP: Math.round(sumP / valid), minP: minP, maxP: maxP,
+        first: first, last: last,
+        durationMin: Math.round((last - first) / 60000)
+      };
+
+      var csv = rows.map(function (r) { return r.join(","); }).join("\r\n") + "\r\n";
+      var fname = tsName(first) + ".csv";
+
+      log('<span class="ok">Built ' + valid + ' rows · ' + dupes + ' duplicate timestamps merged</span>');
+      log("Range: " + fmtTime(first) + "  →  " + fmtTime(last) + "  (" + stats.durationMin + " min" +
+          (first.toDateString() !== last.toDateString() ? ", spans midnight ✓" : "") + ")");
+      log("Output file: " + fname);
+
+      return { rows: rows, csv: csv, fname: fname, stats: stats };
+    }
+
+    function fmtTime(d) {
+      return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + " " +
+             pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    }
+    function tsName(d) {
+      return "" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+             pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+    }
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+    // ====================================================================
+    //  Render results
+    // ====================================================================
+    function renderResult(result) {
+      var s = result.stats;
+
+      // download
+      if (downloadBtn.href && downloadBtn.href.indexOf("blob:") === 0) URL.revokeObjectURL(downloadBtn.href);
+      var blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+      downloadBtn.href = URL.createObjectURL(blob);
+      downloadBtn.download = result.fname;
+      downloadBtn.classList.remove("hidden");
+      $("successBurst").classList.remove("hidden");
+
+      readySummary.textContent = s.valid.toLocaleString() + " readings · " + s.durationMin +
+        " min" + (s.first.toDateString() !== s.last.toDateString() ? " · spans midnight" : "") +
+        " · saved as " + result.fname;
+
+      // stats
+      var cards = [
+        ["Readings", s.valid.toLocaleString()],
+        ["Avg SpO₂", s.avgS + "%"],
+        ["Min SpO₂", s.minS + "%"],
+        ["Avg Pulse", s.avgP + " bpm"],
+        ["Min Pulse", s.minP + " bpm"],
+        ["Max Pulse", s.maxP + " bpm"]
+      ];
+      statsEl.innerHTML = "";
+      cards.forEach(function (c, i) {
+        var el = document.createElement("div");
+        el.className = "stat";
+        el.style.animationDelay = (i * 50) + "ms";
+        el.innerHTML = '<div class="v" data-target="' + escapeAttr(c[1]) + '">' + c[1] + '</div><div class="l">' + c[0] + "</div>";
+        statsEl.appendChild(el);
+      });
+      animateCounters();
+
+      // preview table
+      renderTable(result.rows);
+      renderLog();
+    }
+
+    function renderTable(rows) {
+      var max = Math.min(rows.length - 1, 12);
+      var html = "<table><thead><tr>";
+      rows[0].forEach(function (h) { html += "<th>" + escapeHtml(h) + "</th>"; });
+      html += "</tr></thead><tbody>";
+      for (var i = 1; i <= max; i++) {
+        html += "<tr>";
+        rows[i].forEach(function (c) { html += "<td>" + escapeHtml(c) + "</td>"; });
+        html += "</tr>";
+      }
+      html += "</tbody></table>";
+      tableWrap.innerHTML = html;
+      tableNote.textContent = (rows.length - 1 > max)
+        ? "Showing first " + max + " of " + (rows.length - 1).toLocaleString() + " rows — download for the full file."
+        : "";
+    }
+
+    function animateCounters() {
+      var nodes = statsEl.querySelectorAll(".v");
+      Array.prototype.forEach.call(nodes, function (node) {
+        var target = node.getAttribute("data-target");
+        var m = target.match(/^([\d,]+)(.*)$/);
+        if (!m) return;
+        var end = parseInt(m[1].replace(/,/g, ""), 10), suffix = m[2] || "";
+        if (!isFinite(end) || end === 0) return;
+        var dur = 700, t0 = performance.now();
+        (function tick(now) {
+          var p = Math.min(1, (now - t0) / dur);
+          var eased = 1 - Math.pow(1 - p, 3);
+          node.textContent = Math.round(end * eased).toLocaleString() + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        })(t0);
+      });
+    }
+
+    // ====================================================================
+    //  UI utilities
+    // ====================================================================
+    function setStep(n, markDone) {
+      Array.prototype.forEach.call(stepper.querySelectorAll(".step"), function (s) {
+        var step = +s.getAttribute("data-step");
+        s.classList.remove("active", "done");
+        if (step < n) s.classList.add("done");
+        else if (step === n) s.classList.add(markDone ? "done" : "active");
+      });
+      if (markDone) {
+        var active = stepper.querySelector('.step[data-step="' + n + '"]');
+        if (active) { active.classList.remove("done"); active.classList.add("active"); }
+      }
+    }
+
+    function setProgress(pct, label) {
+      progressFill.style.width = pct + "%";
+      progressLabel.textContent = label;
+    }
+
+    function resetAll() {
+      clearFile();
+      statsEl.innerHTML = ""; tableWrap.innerHTML = ""; tableNote.textContent = ""; logEl.innerHTML = "";
+      setProgress(0, "");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function log(line) { state.logLines.push(line); }
+    function renderLog() { logEl.innerHTML = state.logLines.join("\n"); }
+
+    var toastTimer;
+    function showToast(msg) {
+      toastMsg.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 6000);
+    }
+    function hideToast() { toast.classList.remove("show"); }
+
+    function humanSize(b) {
+      if (b == null) return "—";
+      if (b < 1024) return b + " B";
+      if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+      return (b / 1048576).toFixed(1) + " MB";
+    }
+    function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+    function escapeAttr(s) { return escapeHtml(s); }
+
+    // ====================================================================
+    //  Sample data: a realistic SleepON-style overnight export (CSV)
+    //  Flat per-second rows, crosses midnight, with a few desat dips.
+    // ====================================================================
+    function buildSample() {
+      var lines = ["Time,SpO2,Pulse Rate,Motion"];
+      var start = new Date(2025, 2, 28, 23, 50, 0); // 28 Mar 2025 23:50 (DD/MM in app)
+      var minutes = 7 * 60; // ~7h, spans midnight into 29 Mar
+      var spo2 = 97, pr = 58;
+      for (var m = 0; m < minutes; m++) {
+        for (var s = 0; s < 60; s += 4) { // device samples ~every 4s
+          // gentle drift
+          spo2 += (Math.random() - 0.5);
+          pr += (Math.random() - 0.5) * 1.5;
+          // occasional desaturation dip
+          if (Math.random() < 0.004) spo2 -= 6 + Math.random() * 5;
+          spo2 = Math.max(82, Math.min(99, spo2));
+          pr = Math.max(46, Math.min(78, pr));
+          var t = new Date(start.getTime() + (m * 60 + s) * 1000);
+          var dd = pad(t.getDate()) + "/" + pad(t.getMonth() + 1) + "/" + t.getFullYear() + " " +
+                   pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
+          lines.push(dd + "," + Math.round(spo2) + "," + Math.round(pr) + ",0");
+        }
+      }
+      return lines.join("\n");
+    }
+  })();
   </script>
 </body>
 </html>
