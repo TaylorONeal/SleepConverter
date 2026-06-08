@@ -254,6 +254,35 @@
       -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
     .stat .l { font-size: .78rem; color: var(--muted); margin-top: 3px; }
 
+    /* ---------- Charts ---------- */
+    .charts { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
+    .chart {
+      background: var(--surface-2); border: 1px solid var(--stroke);
+      border-radius: var(--radius-sm); padding: 14px 14px 8px;
+      animation: rise .5s var(--ease) both;
+    }
+    .chart-title { font-weight: 700; font-size: .98rem; }
+    .chart-sub { font-size: .78rem; color: var(--muted-2); margin: 2px 0 10px; }
+    .svg-chart { width: 100%; height: auto; display: block; }
+    .svg-chart .draw {
+      stroke-dasharray: 4000; stroke-dashoffset: 4000;
+      animation: drawline 1.4s var(--ease) forwards;
+    }
+    @keyframes drawline { to { stroke-dashoffset: 0; } }
+
+    .stage-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
+    .stage-item { display: flex; align-items: center; gap: 7px; font-size: .82rem; }
+    .stage-item .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+    .stage-item .sk { font-weight: 600; }
+    .stage-item .sv { color: var(--muted-2); }
+
+    .bands { display: flex; flex-direction: column; gap: 9px; padding: 4px 0 8px; }
+    .band { display: grid; grid-template-columns: 58px 1fr 44px; align-items: center; gap: 10px; font-size: .82rem; }
+    .band .bl { color: var(--muted); text-align: right; }
+    .band .bt { height: 14px; background: rgba(255,255,255,.06); border-radius: 999px; overflow: hidden; }
+    .band .bf { display: block; height: 100%; border-radius: 999px; transition: width .8s var(--ease); }
+    .band .bv { color: var(--muted); font-variant-numeric: tabular-nums; }
+
     /* ---------- Table ---------- */
     .table-wrap {
       margin-top: 16px; border: 1px solid var(--stroke); border-radius: var(--radius-sm);
@@ -438,8 +467,16 @@
 
       <div class="stats" id="stats"></div>
 
-      <div class="table-wrap" id="tableWrap"></div>
-      <div class="table-note" id="tableNote"></div>
+      <div class="charts" id="charts"></div>
+
+      <details class="disc" id="previewDisc">
+        <summary>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Preview the converted rows
+        </summary>
+        <div class="table-wrap" id="tableWrap"></div>
+        <div class="table-note" id="tableNote"></div>
+      </details>
 
       <div class="btn-row">
         <a class="btn btn-primary btn-lg" id="downloadBtn" download>
@@ -619,7 +656,7 @@
           // Still surface the log so the user can tell us what their file looks like.
           if (state.logLines.length) {
             card3.classList.remove("hidden");
-            statsEl.innerHTML = ""; tableWrap.innerHTML = ""; tableNote.textContent = "";
+            statsEl.innerHTML = ""; tableWrap.innerHTML = ""; tableNote.textContent = ""; $("charts").innerHTML = "";
             $("successBurst").classList.add("hidden");
             readySummary.textContent = "Conversion failed — see details below.";
             downloadBtn.classList.add("hidden");
@@ -715,27 +752,50 @@
 
       // 2) Map columns by fuzzy aliases.
       var idx = {
-        time:   matchCol(lower, ["time", "date", "datetime", "date time", "timestamp", "starttime", "start time", "recordtime"]),
-        spo2:   matchCol(lower, ["oxygen level", "oxygen", "spo2", "spo₂", "o2", "sao2", "blood oxygen", "saturation", "spo2raw", "spo2(%)", "oxygen saturation"]),
-        pr:     matchCol(lower, ["pulse rate", "pulse", "heart rate", "heartrate", "pr", "hr", "bpm", "heart", "heartraw", "pulse(bpm)"]),
-        motion: matchCol(lower, ["motion", "movement", "active", "activity", "move", "bodymotion"])
+        time:     matchCol(lower, ["time", "date", "datetime", "date time", "timestamp", "starttime", "start time", "recordtime"]),
+        spo2:     matchCol(lower, ["oxygen level", "oxygen", "spo2", "spo₂", "o2", "sao2", "blood oxygen", "saturation", "spo2raw", "spo2(%)", "oxygen saturation"]),
+        pr:       matchCol(lower, ["pulse rate", "pulse", "heart rate", "heartrate", "pr", "hr", "bpm", "heart", "heartraw", "pulse(bpm)"]),
+        motion:   matchCol(lower, ["motion", "movement", "active", "activity", "move", "bodymotion"]),
+        tz:       matchCol(lower, ["time_zone", "timezone", "time zone", "utc_offset", "utc offset", "gmt_offset", "gmt", "tz", "offset"]),
+        stage:    matchCol(lower, ["stage", "sleep stage", "sleep_stage", "sleepstage", "sleep state"]),
+        validity: matchCol(lower, ["validity", "valid"])
       };
       log("Mapped → time:" + colName(headers, idx.time) + "  spo2:" + colName(headers, idx.spo2) +
           "  pulse:" + colName(headers, idx.pr) + "  motion:" + colName(headers, idx.motion));
+      if (idx.tz !== -1)    log("Timezone column: " + colName(headers, idx.tz));
+      if (idx.stage !== -1) log("Sleep-stage column: " + colName(headers, idx.stage));
 
       var dataRows = matrix.slice(headerRow + 1);
+
+      // SleepON cloud exports record Time in UTC (ISO …Z) plus a separate offset
+      // column. Read that offset once so we can convert to the recording's local
+      // wall-clock — the time SleepHQ aligns against. Without this the whole night
+      // lands in the wrong timezone (and often the wrong day).
+      var fileOffset = null;
+      if (idx.tz !== -1) {
+        for (var ti = 0; ti < dataRows.length; ti++) {
+          var off = parseOffset(dataRows[ti][idx.tz]);
+          if (off != null) { fileOffset = off; break; }
+        }
+        if (fileOffset != null) {
+          var sign = fileOffset < 0 ? "-" : "+";
+          var abs = Math.abs(fileOffset);
+          log("Local time offset: UTC" + sign + pad(Math.floor(abs / 60)) + ":" + pad(abs % 60) +
+              " — converting UTC timestamps to local time");
+        }
+      }
 
       // 3) Detect the "packed raw array" SleepON format (spo2Raw/heartRaw cells hold many values).
       var packed = detectPacked(dataRows, idx);
       var readings;
       if (packed) {
         log("Detected packed SleepON format (per-row sample arrays). Expanding…");
-        readings = expandPacked(dataRows, idx, headerInfo);
+        readings = expandPacked(dataRows, idx, lower, fileOffset);
       } else {
         if (idx.time === -1 || idx.spo2 === -1 || idx.pr === -1) {
           throw new Error("Couldn’t find the Time, SpO₂ and Pulse columns. Open “Conversion details” to see what columns were detected, then pick the right export or tell us the headers.");
         }
-        readings = expandFlat(dataRows, idx);
+        readings = expandFlat(dataRows, idx, fileOffset);
       }
 
       if (!readings.length) {
@@ -792,52 +852,71 @@
     }
 
     // --- Flat: one reading per row ---------------------------------------
-    function expandFlat(dataRows, idx) {
-      var timeStrings = dataRows.map(function (r) { return r[idx.time]; });
-      var dayFirst = resolveDayFirst(timeStrings);
+    function expandFlat(dataRows, idx, fileOffset) {
+      var dayFirst = resolveDayFirst(dataRows.map(function (r) { return r[idx.time]; }));
       var out = [];
-      var skippedTime = 0, skippedVals = 0;
+      var skippedTime = 0, skippedVals = 0, skippedInvalid = 0;
       for (var i = 0; i < dataRows.length; i++) {
         var r = dataRows[i];
-        var t = parseDate(r[idx.time], dayFirst);
+        if (idx.validity !== -1 && isMarkedInvalid(r[idx.validity])) { skippedInvalid++; continue; }
+        var t = localTime(r[idx.time], fileOffset, dayFirst);
         if (!t) { skippedTime++; continue; }
         var spo2 = sanitizeSpo2(num(r[idx.spo2]));
         var pr = sanitizePr(num(r[idx.pr]));
         if (spo2 == null || pr == null) { skippedVals++; continue; }
         var motion = idx.motion !== -1 ? Math.max(0, Math.round(num(r[idx.motion])) || 0) : 0;
-        out.push({ t: t, spo2: spo2, pr: pr, motion: motion });
+        var stage = idx.stage !== -1 ? normStage(r[idx.stage]) : null;
+        out.push({ t: t, spo2: spo2, pr: pr, motion: motion, stage: stage });
       }
-      log("Flat rows → kept " + out.length + ", skipped " + skippedTime + " (bad/no time), " + skippedVals + " (out-of-range SpO₂/pulse)");
+      log("Flat rows → kept " + out.length + ", skipped " + skippedTime + " (bad/no time), " +
+          skippedVals + " (out-of-range SpO₂/pulse)" + (skippedInvalid ? ", " + skippedInvalid + " (flagged invalid)" : ""));
       return out;
     }
 
     // --- Packed: each row has arrays of samples between start & end -------
-    function expandPacked(dataRows, idx, headerInfo) {
-      var headers = headerInfo.lower || [];
-      // try to find an end-time column for interval sizing
-      var endIdx = matchCol(headers, ["endtime", "end time", "stoptime", "end"]);
+    function expandPacked(dataRows, idx, lower, fileOffset) {
+      var endIdx = matchCol(lower, ["endtime", "end time", "stoptime", "end"]);
       var out = [], rowsUsed = 0;
       var dayFirst = resolveDayFirst(dataRows.map(function (r) { return r[idx.time]; }));
       for (var i = 0; i < dataRows.length; i++) {
         var r = dataRows[i];
-        var start = parseDate(r[idx.time], dayFirst);
+        var start = localTime(r[idx.time], fileOffset, dayFirst);
         if (!start) continue;
         var spo2Arr = idx.spo2 !== -1 ? splitNums(r[idx.spo2]) : [];
         var prArr   = idx.pr   !== -1 ? splitNums(r[idx.pr])   : [];
         var n = Math.max(spo2Arr.length, prArr.length);
         if (n === 0) continue;
-        var end = endIdx !== -1 ? parseDate(r[endIdx], dayFirst) : null;
+        var end = endIdx !== -1 ? localTime(r[endIdx], fileOffset, dayFirst) : null;
         var stepMs = end ? Math.max(1000, (end.getTime() - start.getTime()) / n) : 1000; // default 1s
         rowsUsed++;
         for (var k = 0; k < n; k++) {
           var spo2 = sanitizeSpo2(spo2Arr.length ? spo2Arr[k] : NaN);
           var pr = sanitizePr(prArr.length ? prArr[k] : NaN);
           if (spo2 == null || pr == null) continue;
-          out.push({ t: new Date(start.getTime() + k * stepMs), spo2: spo2, pr: pr, motion: 0 });
+          out.push({ t: new Date(start.getTime() + k * stepMs), spo2: spo2, pr: pr, motion: 0, stage: null });
         }
       }
       log("Packed rows used: " + rowsUsed + " → expanded to " + out.length + " readings");
       return out;
+    }
+
+    function isMarkedInvalid(v) {
+      if (v == null) return false;
+      var s = String(v).trim().toLowerCase();
+      return s === "0" || s === "false" || s === "no" || s === "invalid";
+    }
+
+    // Sleep-stage labels normalised to a canonical set for the hypnogram.
+    function normStage(v) {
+      if (v == null) return null;
+      var s = String(v).trim().toUpperCase();
+      if (!s) return null;
+      if (s.indexOf("WAKE") !== -1 || s === "W") return "Wake";
+      if (s.indexOf("REM") !== -1) return "REM";
+      if (s === "N1" || s === "1" || s.indexOf("LIGHT") !== -1) return "N1";
+      if (s === "N2" || s === "2") return "N2";
+      if (s === "N3" || s === "3" || s.indexOf("DEEP") !== -1) return "N3";
+      return s;
     }
 
     function splitNums(v) {
@@ -873,6 +952,45 @@
       var dayFirst = monthWins > dayWins ? false : true; // default to day-first (SleepON/international)
       log("Date order: auto → " + (dayFirst ? "Day/Month" : "Month/Day") + " (D:" + dayWins + " M:" + monthWins + ")");
       return dayFirst;
+    }
+
+    // Parse a timezone offset like "-05:00", "+0930", "-5", "GMT+2" → minutes.
+    function parseOffset(v) {
+      if (v == null) return null;
+      if (typeof v === "number") return Math.round(v * (Math.abs(v) <= 14 ? 60 : 1)); // hours or minutes
+      var s = String(v).trim();
+      var m = s.match(/([+\-])\s*(\d{1,2}):?(\d{2})?/);
+      if (!m) return null;
+      return (m[1] === "-" ? -1 : 1) * ((+m[2]) * 60 + (+(m[3] || 0)));
+    }
+
+    // Build a local-wall-clock Date from an absolute instant + offset (minutes).
+    function wallClock(instantMs, offMin) {
+      var s = new Date(instantMs + offMin * 60000);
+      return new Date(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate(),
+                      s.getUTCHours(), s.getUTCMinutes(), s.getUTCSeconds());
+    }
+
+    // Resolve a cell into the recording's *local* wall-clock time.
+    //  - UTC values (ISO "…Z", or a Date from an ISO-Z cell) + a file offset → localise
+    //  - values that already carry their own offset / are plain local → use as-is
+    function localTime(raw, fileOffset, dayFirst) {
+      if (raw == null || raw === "") return null;
+      if (raw instanceof Date) {
+        if (isNaN(raw.getTime())) return null;
+        // A Date here came from an ISO/Excel cell = an absolute instant.
+        if (fileOffset != null) return wallClock(raw.getTime(), fileOffset);
+        // No offset known → use the stored UTC wall-clock so results are
+        // identical regardless of the viewer's own timezone.
+        return wallClock(raw.getTime(), 0);
+      }
+      var s = String(raw).trim();
+      if (/[zZ]$/.test(s)) {                       // explicit UTC
+        var inst = Date.parse(s);
+        if (!isNaN(inst)) return wallClock(inst, fileOffset != null ? fileOffset : 0);
+      }
+      // ISO/locale string with or without embedded offset → components are local
+      return parseDate(s, dayFirst);
     }
 
     function parseDate(v, dayFirst) {
@@ -931,9 +1049,9 @@
       readings.sort(function (a, b) { return a.t - b.t; });
 
       var rows = [OUT_HEADER.slice()];
+      var kept = [];
       var seen = Object.create(null);
       var dupes = 0;
-      var sumS = 0, sumP = 0, minS = 100, maxS = 0, minP = 999, maxP = 0;
 
       for (var i = 0; i < readings.length; i++) {
         var rd = readings[i];
@@ -941,30 +1059,82 @@
         if (seen[time]) { dupes++; continue; }   // one reading per second
         seen[time] = 1;
         rows.push([time, String(rd.spo2), String(rd.pr), String(rd.motion), "0", "0"]);
-        sumS += rd.spo2; sumP += rd.pr;
-        if (rd.spo2 < minS) minS = rd.spo2; if (rd.spo2 > maxS) maxS = rd.spo2;
-        if (rd.pr < minP) minP = rd.pr; if (rd.pr > maxP) maxP = rd.pr;
+        kept.push(rd);
       }
 
-      var valid = rows.length - 1;
-      var first = readings[0].t, last = readings[readings.length - 1].t;
-      var stats = {
-        valid: valid, dupes: dupes,
-        avgS: Math.round(sumS / valid), minS: minS, maxS: maxS,
-        avgP: Math.round(sumP / valid), minP: minP, maxP: maxP,
-        first: first, last: last,
-        durationMin: Math.round((last - first) / 60000)
-      };
+      var stats = computeInsights(kept);
+      stats.dupes = dupes;
 
       var csv = rows.map(function (r) { return r.join(","); }).join("\r\n") + "\r\n";
-      var fname = tsName(first) + ".csv";
+      var fname = tsName(stats.first) + ".csv";
 
-      log('<span class="ok">Built ' + valid + ' rows · ' + dupes + ' duplicate timestamps merged</span>');
-      log("Range: " + fmtTime(first) + "  →  " + fmtTime(last) + "  (" + stats.durationMin + " min" +
-          (first.toDateString() !== last.toDateString() ? ", spans midnight ✓" : "") + ")");
+      log('<span class="ok">Built ' + stats.valid + ' rows · ' + dupes + ' duplicate timestamps merged</span>');
+      log("Range: " + fmtTime(stats.first) + "  →  " + fmtTime(stats.last) + "  (" + fmtDuration(stats.durationMin) +
+          (stats.first.toDateString() !== stats.last.toDateString() ? ", spans midnight ✓" : "") + ")");
+      log("Avg SpO₂ " + stats.avgS + "% (min " + stats.minS + "%) · time <90%: " + stats.pct90 +
+          "% · desaturations: " + stats.desatEvents + " (ODI≈" + stats.odi + ")");
+      if (stats.stageOrder.length) {
+        log("Sleep stages (min): " + stats.stageOrder.map(function (k) { return k + " " + Math.round(stats.stageSec[k] / 60); }).join(", "));
+      }
       log("Output file: " + fname);
 
-      return { rows: rows, csv: csv, fname: fname, stats: stats };
+      return { rows: rows, csv: csv, fname: fname, stats: stats, readings: kept };
+    }
+
+    // ---- Insights / clinical-style summary -------------------------------
+    function computeInsights(rd) {
+      var n = rd.length;
+      var sumS = 0, sumP = 0, minS = 100, maxS = 0, minP = 999, maxP = 0;
+      var b90 = 0, b88 = 0, sumMotion = 0;
+      var stageSec = {}, stageOrder = [];
+      // desaturation events: SpO₂ drops ≥3% below a slow baseline and crosses under 90%
+      var desatEvents = 0, below = false;
+      for (var i = 0; i < n; i++) {
+        var r = rd[i], s = r.spo2, p = r.pr;
+        sumS += s; sumP += p;
+        if (s < minS) minS = s; if (s > maxS) maxS = s;
+        if (p < minP) minP = p; if (p > maxP) maxP = p;
+        if (s < 90) b90++;
+        if (s < 88) b88++;
+        sumMotion += r.motion || 0;
+        if (!below && s < 90) { below = true; desatEvents++; }
+        else if (below && s >= 91) { below = false; }
+        if (r.stage) {
+          if (stageSec[r.stage] == null) { stageSec[r.stage] = 0; stageOrder.push(r.stage); }
+          stageSec[r.stage]++;
+        }
+      }
+      var first = rd[0].t, last = rd[n - 1].t;
+      var spanSec = Math.max(1, Math.round((last - first) / 1000));
+      var hours = spanSec / 3600;
+      // SpO₂ distribution bands for the mini-histogram
+      var bands = [["95–100", 0], ["90–94", 0], ["85–89", 0], ["80–84", 0], ["<80", 0]];
+      for (var j = 0; j < n; j++) {
+        var v = rd[j].spo2;
+        if (v >= 95) bands[0][1]++; else if (v >= 90) bands[1][1]++;
+        else if (v >= 85) bands[2][1]++; else if (v >= 80) bands[3][1]++; else bands[4][1]++;
+      }
+      // canonical stage ordering for the hypnogram (top→bottom)
+      var order = ["Wake", "REM", "N1", "N2", "N3"];
+      stageOrder.sort(function (a, b) {
+        var ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+      return {
+        valid: n,
+        avgS: Math.round(sumS / n), minS: minS, maxS: maxS,
+        avgP: Math.round(sumP / n), minP: minP, maxP: maxP,
+        avgMotion: Math.round(sumMotion / n),
+        pct90: +(100 * b90 / n).toFixed(1),
+        pct88: +(100 * b88 / n).toFixed(1),
+        secBelow90: b90,
+        desatEvents: desatEvents,
+        odi: +(desatEvents / hours).toFixed(1),
+        first: first, last: last,
+        durationMin: Math.round(spanSec / 60),
+        bands: bands,
+        stageSec: stageSec, stageOrder: stageOrder
+      };
     }
 
     function fmtTime(d) {
@@ -976,6 +1146,10 @@
              pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
     }
     function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function fmtDuration(min) {
+      var h = Math.floor(min / 60), m = min % 60;
+      return (h ? h + "h " : "") + m + "m";
+    }
 
     // ====================================================================
     //  Render results
@@ -991,33 +1165,275 @@
       downloadBtn.classList.remove("hidden");
       $("successBurst").classList.remove("hidden");
 
-      readySummary.textContent = s.valid.toLocaleString() + " readings · " + s.durationMin +
-        " min" + (s.first.toDateString() !== s.last.toDateString() ? " · spans midnight" : "") +
+      readySummary.textContent = s.valid.toLocaleString() + " readings · " + fmtDuration(s.durationMin) +
+        (s.first.toDateString() !== s.last.toDateString() ? " · spans midnight" : "") +
         " · saved as " + result.fname;
 
-      // stats
+      // headline insight stats
       var cards = [
         ["Readings", s.valid.toLocaleString()],
         ["Avg SpO₂", s.avgS + "%"],
-        ["Min SpO₂", s.minS + "%"],
+        ["Lowest SpO₂", s.minS + "%"],
+        ["Time < 90%", s.pct90 + "%"],
+        ["Desaturations", s.desatEvents + ""],
+        ["ODI", s.odi + ""],
         ["Avg Pulse", s.avgP + " bpm"],
-        ["Min Pulse", s.minP + " bpm"],
-        ["Max Pulse", s.maxP + " bpm"]
+        ["Pulse range", s.minP + "–" + s.maxP]
       ];
       statsEl.innerHTML = "";
       cards.forEach(function (c, i) {
         var el = document.createElement("div");
         el.className = "stat";
-        el.style.animationDelay = (i * 50) + "ms";
+        el.style.animationDelay = (i * 45) + "ms";
         el.innerHTML = '<div class="v" data-target="' + escapeAttr(c[1]) + '">' + c[1] + '</div><div class="l">' + c[0] + "</div>";
         statsEl.appendChild(el);
       });
       animateCounters();
 
+      // visualizations
+      renderCharts(result.readings, s);
+
       // preview table
       renderTable(result.rows);
       renderLog();
     }
+
+    // ====================================================================
+    //  Visualizations (inline SVG, no dependencies)
+    // ====================================================================
+    function renderCharts(readings, stats) {
+      var host = $("charts");
+      host.innerHTML = "";
+
+      // SpO₂ over the night — area + 90% threshold, dips shaded
+      host.appendChild(chartBlock("Blood oxygen through the night",
+        "Each point is one second of SpO₂. The dashed line marks 90% — dips below it are highlighted.",
+        lineChart(readings, function (r) { return r.spo2; }, {
+          color: "#22d3ee", fill: true, yMin: Math.min(80, stats.minS - 2), yMax: 100,
+          threshold: 90, shadeBelow: 90, unit: "%"
+        })));
+
+      // Pulse over the night
+      host.appendChild(chartBlock("Pulse rate through the night",
+        "Beats per minute across the recording.",
+        lineChart(readings, function (r) { return r.pr; }, {
+          color: "#ff52a8", fill: true, yMin: Math.max(30, stats.minP - 5), yMax: stats.maxP + 5, unit: " bpm"
+        })));
+
+      // Hypnogram (only if sleep-stage data is present)
+      if (stats.stageOrder.length) {
+        host.appendChild(chartBlock("Sleep stages (hypnogram)",
+          "Reconstructed from the SleepON Stage column — for insight only; it is not written to the SleepHQ file.",
+          hypnogram(readings, stats)));
+        host.appendChild(stageBreakdown(stats));
+      }
+
+      // SpO₂ distribution bands
+      host.appendChild(chartBlock("Time spent in each SpO₂ range",
+        "How much of the night was spent in each oxygen band.",
+        bandBars(stats.bands, stats.valid)));
+    }
+
+    function chartBlock(title, sub, node) {
+      var wrap = document.createElement("div");
+      wrap.className = "chart";
+      var h = document.createElement("div"); h.className = "chart-title"; h.textContent = title;
+      var p = document.createElement("div"); p.className = "chart-sub"; p.textContent = sub;
+      wrap.appendChild(h); wrap.appendChild(p); wrap.appendChild(node);
+      return wrap;
+    }
+
+    // downsample to ~W points by min/extreme so dips survive
+    function downsample(readings, accessor, buckets) {
+      var n = readings.length;
+      if (n <= buckets) return readings.map(function (r, i) { return { i: i, v: accessor(r), t: r.t }; });
+      var step = n / buckets, out = [];
+      for (var b = 0; b < buckets; b++) {
+        var start = Math.floor(b * step), end = Math.floor((b + 1) * step);
+        var minV = Infinity, idx = start;
+        for (var k = start; k < end && k < n; k++) {
+          var v = accessor(readings[k]);
+          if (v < minV) { minV = v; idx = k; }       // keep the lowest (worst) point per bucket
+        }
+        out.push({ i: idx, v: minV === Infinity ? accessor(readings[start]) : minV, t: readings[idx].t });
+      }
+      return out;
+    }
+
+    function lineChart(readings, accessor, opt) {
+      var W = 1000, H = 240, padL = 38, padR = 12, padT = 14, padB = 26;
+      var pts = downsample(readings, accessor, 600);
+      var yMin = opt.yMin, yMax = opt.yMax, span = (yMax - yMin) || 1;
+      var x = function (i) { return padL + (i / (pts.length - 1 || 1)) * (W - padL - padR); };
+      var y = function (v) { return padT + (1 - (v - yMin) / span) * (H - padT - padB); };
+
+      var ns = "http://www.w3.org/2000/svg";
+      var svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("class", "svg-chart");
+      svg.setAttribute("preserveAspectRatio", "none");
+
+      // gridlines + y labels
+      var ticks = niceTicks(yMin, yMax, 4);
+      ticks.forEach(function (tv) {
+        line(svg, ns, padL, y(tv), W - padR, y(tv), "rgba(255,255,255,.07)", 1);
+        text(svg, ns, 4, y(tv) + 4, String(tv), "#6f78a8", 13, "start");
+      });
+
+      // x time labels (start / mid / end)
+      [0, Math.floor(pts.length / 2), pts.length - 1].forEach(function (i, k) {
+        if (!pts[i]) return;
+        text(svg, ns, x(i), H - 6, hhmm(pts[i].t), "#6f78a8", 13, k === 0 ? "start" : (k === 2 ? "end" : "middle"));
+      });
+
+      // threshold line + below-threshold shading
+      if (opt.threshold != null) {
+        line(svg, ns, padL, y(opt.threshold), W - padR, y(opt.threshold), "rgba(255,92,108,.55)", 1.5, "4 4");
+      }
+
+      var dPath = "", aPath = "";
+      pts.forEach(function (p, i) {
+        var px = x(i), py = y(p.v);
+        dPath += (i ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1) + " ";
+        aPath += (i ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1) + " ";
+      });
+      if (opt.fill) {
+        var area = aPath + "L" + x(pts.length - 1) + " " + y(yMin) + " L" + x(0) + " " + y(yMin) + " Z";
+        var gid = "g" + Math.random().toString(36).slice(2);
+        var defs = document.createElementNS(ns, "defs");
+        defs.innerHTML = '<linearGradient id="' + gid + '" x1="0" x2="0" y1="0" y2="1">' +
+          '<stop offset="0%" stop-color="' + opt.color + '" stop-opacity=".45"/>' +
+          '<stop offset="100%" stop-color="' + opt.color + '" stop-opacity="0"/></linearGradient>';
+        svg.appendChild(defs);
+        path(svg, ns, area, "none", gid);
+      }
+      // shade dips below threshold in red
+      if (opt.shadeBelow != null) {
+        var seg = null;
+        pts.forEach(function (p, i) {
+          if (p.v < opt.shadeBelow) { if (!seg) seg = "M" + x(i) + " " + y(p.v) + " "; else seg += "L" + x(i) + " " + y(p.v) + " "; }
+          else if (seg) { closeShade(svg, ns, seg, x, y, yMin, i); seg = null; }
+        });
+        if (seg) closeShade(svg, ns, seg, x, y, yMin, pts.length - 1);
+      }
+      var pEl = document.createElementNS(ns, "path");
+      pEl.setAttribute("d", dPath); pEl.setAttribute("fill", "none");
+      pEl.setAttribute("stroke", opt.color); pEl.setAttribute("stroke-width", "2");
+      pEl.setAttribute("stroke-linejoin", "round"); pEl.setAttribute("class", "draw");
+      svg.appendChild(pEl);
+      return svg;
+    }
+    function closeShade(svg, ns, seg, x, y, yMin, endI) {
+      var d = seg + "L" + x(endI) + " " + y(yMin) + " ";
+      // close back along baseline
+      var startX = seg.slice(1).trim().split(" ")[0];
+      d += "L" + startX + " " + y(yMin) + " Z";
+      path(svg, ns, d, "none", null, "rgba(255,92,108,.22)");
+    }
+
+    function hypnogram(readings, stats) {
+      var W = 1000, H = 170, padL = 38, padR = 12, padT = 12, padB = 24;
+      var levels = stats.stageOrder;                 // already ordered Wake→N3
+      var lvlY = {}; levels.forEach(function (s, i) { lvlY[s] = padT + (i / Math.max(1, levels.length - 1)) * (H - padT - padB); });
+      var ns = "http://www.w3.org/2000/svg";
+      var svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("class", "svg-chart"); svg.setAttribute("preserveAspectRatio", "none");
+      levels.forEach(function (s) {
+        line(svg, ns, padL, lvlY[s], W - padR, lvlY[s], "rgba(255,255,255,.06)", 1);
+        text(svg, ns, 4, lvlY[s] + 4, s, "#8c95c2", 13, "start");
+      });
+      var pts = downsample(readings, function (r) { return r.stage ? levels.indexOf(r.stage) : -1; }, 700);
+      var x = function (i) { return padL + (i / (pts.length - 1 || 1)) * (W - padL - padR); };
+      var d = "", started = false;
+      readingsToStep(readings, levels, 700).forEach(function (p, i) {
+        if (p.lvl < 0) { started = false; return; }
+        var px = padL + (p.f) * (W - padL - padR), py = padT + (p.lvl / Math.max(1, levels.length - 1)) * (H - padT - padB);
+        d += (started ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1) + " ";
+        started = true;
+      });
+      var pEl = document.createElementNS(ns, "path");
+      pEl.setAttribute("d", d); pEl.setAttribute("fill", "none");
+      pEl.setAttribute("stroke", "#b14dff"); pEl.setAttribute("stroke-width", "2");
+      pEl.setAttribute("stroke-linejoin", "round"); pEl.setAttribute("class", "draw");
+      svg.appendChild(pEl);
+      [0, 0.5, 1].forEach(function (f, k) {
+        var t = readings[Math.min(readings.length - 1, Math.floor(f * (readings.length - 1)))].t;
+        text(svg, ns, padL + f * (W - padL - padR), H - 6, hhmm(t), "#6f78a8", 13, k === 0 ? "start" : (k === 2 ? "end" : "middle"));
+      });
+      return svg;
+    }
+    function readingsToStep(readings, levels, buckets) {
+      var n = readings.length, step = n / buckets, out = [];
+      for (var b = 0; b < buckets; b++) {
+        var idx = Math.min(n - 1, Math.floor(b * step));
+        var st = readings[idx].stage;
+        out.push({ f: b / (buckets - 1), lvl: st ? levels.indexOf(st) : -1 });
+      }
+      return out;
+    }
+
+    function stageBreakdown(stats) {
+      var total = stats.stageOrder.reduce(function (a, k) { return a + stats.stageSec[k]; }, 0) || 1;
+      var colors = { Wake: "#ffc34d", REM: "#b14dff", N1: "#22d3ee", N2: "#4f8cff", N3: "#34d399" };
+      var wrap = document.createElement("div"); wrap.className = "stage-legend";
+      stats.stageOrder.forEach(function (k) {
+        var minutes = Math.round(stats.stageSec[k] / 60);
+        var pct = Math.round(100 * stats.stageSec[k] / total);
+        var item = document.createElement("div"); item.className = "stage-item";
+        item.innerHTML = '<span class="sw" style="background:' + (colors[k] || "#888") + '"></span>' +
+          '<span class="sk">' + escapeHtml(k) + '</span>' +
+          '<span class="sv">' + minutes + ' min · ' + pct + '%</span>';
+        wrap.appendChild(item);
+      });
+      return wrap;
+    }
+
+    function bandBars(bands, total) {
+      var wrap = document.createElement("div"); wrap.className = "bands";
+      var colors = ["#34d399", "#22d3ee", "#ffc34d", "#ff9f43", "#ff5c6c"];
+      var max = bands.reduce(function (m, b) { return Math.max(m, b[1]); }, 1);
+      bands.forEach(function (b, i) {
+        var pct = Math.round(100 * b[1] / total);
+        var row = document.createElement("div"); row.className = "band";
+        row.innerHTML = '<span class="bl">' + b[0] + '%</span>' +
+          '<span class="bt"><span class="bf" style="width:' + (100 * b[1] / max) + '%;background:' + colors[i] + '"></span></span>' +
+          '<span class="bv">' + pct + '%</span>';
+        wrap.appendChild(row);
+      });
+      return wrap;
+    }
+
+    // svg helpers
+    function line(svg, ns, x1, y1, x2, y2, stroke, w, dash) {
+      var l = document.createElementNS(ns, "line");
+      l.setAttribute("x1", x1); l.setAttribute("y1", y1); l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+      l.setAttribute("stroke", stroke); l.setAttribute("stroke-width", w);
+      if (dash) l.setAttribute("stroke-dasharray", dash);
+      svg.appendChild(l);
+    }
+    function text(svg, ns, x, y, str, fill, size, anchor) {
+      var t = document.createElementNS(ns, "text");
+      t.setAttribute("x", x); t.setAttribute("y", y); t.setAttribute("fill", fill);
+      t.setAttribute("font-size", size); t.setAttribute("text-anchor", anchor || "start");
+      t.setAttribute("font-family", "inherit"); t.textContent = str;
+      svg.appendChild(t);
+    }
+    function path(svg, ns, d, stroke, gradId, fill) {
+      var p = document.createElementNS(ns, "path");
+      p.setAttribute("d", d);
+      p.setAttribute("fill", gradId ? "url(#" + gradId + ")" : (fill || "none"));
+      if (stroke && stroke !== "none") p.setAttribute("stroke", stroke);
+      svg.appendChild(p);
+    }
+    function niceTicks(min, max, count) {
+      var out = [], stepRaw = (max - min) / count;
+      var pow = Math.pow(10, Math.floor(Math.log10(stepRaw)));
+      var step = Math.max(1, Math.round(stepRaw / pow) * pow);
+      for (var v = Math.ceil(min / step) * step; v <= max; v += step) out.push(Math.round(v));
+      return out;
+    }
+    function hhmm(d) { return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
 
     function renderTable(rows) {
       var max = Math.min(rows.length - 1, 12);
@@ -1078,6 +1494,7 @@
     function resetAll() {
       clearFile();
       statsEl.innerHTML = ""; tableWrap.innerHTML = ""; tableNote.textContent = ""; logEl.innerHTML = "";
+      $("charts").innerHTML = "";
       setProgress(0, "");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }

@@ -1,74 +1,79 @@
 # SleepConverter
 
-Convert SleepON / Go2Sleep ring data into a Wellue/Viatom **O2 Ring CSV** that **SleepHQ** accepts.
+Convert **SleepON / Go2Sleep** ring data into a **Wellue/Viatom O2 Ring CSV** that **SleepHQ** accepts —
+with one click, fully offline, and now with built-in sleep analysis and charts.
 
-# Sleep Ring Converter 💤🔁📈
+![Example night dashboard](docs/assets/example-night.svg)
 
-**Transform SleepON ring data into a SleepHQ-ready CSV — in your browser, fully offline.**
-
-This is a single self-contained HTML file. Open it (or host it anywhere static) and convert
-SleepON 3 / Go2Sleep `CSV` or `XLSX` exports into the format SleepHQ’s O2 Ring importer
-recognises. No account, no upload, no backend — your sleep data never leaves your device.
+> 📖 **[Read the detailed data-format & conversion write-up →](docs/DATA_FORMAT.md)** —
+> the exact SleepON export layout, the UTC/timezone gotcha, the SleepHQ output spec,
+> the conversion pipeline, and the insights/visualizations, all verified against a real export.
 
 ---
 
-## 🚀 What it does
+## Why it exists
 
-- **Reads real-world SleepON exports**
-  - Flat per-second/per-4s tables (`RawData-Second-…​.xlsx` and CSV exports)
-  - “Packed” exports where `spo2Raw` / `heartRaw` hold comma-separated sample arrays per row (auto-expanded)
-  - `.csv`, `.xlsx`, `.xls`, tab- or semicolon-delimited text
-  - Fuzzy column matching (Time/Date, SpO₂/Oxygen, Pulse/PR/Heart Rate, Motion)
-  - Metadata/title rows above the header are skipped automatically
+SleepON/Go2Sleep rings record excellent overnight SpO₂ and pulse data, but the
+export doesn't drop straight into [SleepHQ](https://sleephq.com). This is a single,
+self-contained HTML file that reformats it correctly — no account, no upload, no
+backend. **Your sleep data never leaves your device.**
 
-- **Correct, lossless conversion**
-  - **Keeps the whole night, including across midnight** (the old version silently dropped everything after 00:00)
-  - Robust date parsing: ISO, `DD/MM/YYYY`, `MM/DD/YYYY`, AM/PM, Excel serial dates, epoch timestamps — with automatic Day/Month vs Month/Day detection (and a manual override)
-  - Filters physiologically impossible readings and de-duplicates identical timestamps
-  - Outputs the exact Wellue/Viatom O2 Ring column layout SleepHQ expects
+## What it does
 
-- **Clear results & troubleshooting**
-  - Animated summary stats (avg/min/max SpO₂ & pulse, reading count, duration)
-  - Preview of the first rows
-  - A **Conversion details** log showing detected columns, date order, skipped rows and the time range — so if a file ever doesn’t parse, you can see exactly why
+- **Reads real SleepON exports** — the cloud `RawDataSecond_…​.xlsx` export, ViHealth-style
+  flat CSVs, and the "packed" `spo2Raw`/`heartRaw` array layout. `.csv`, `.xlsx`, `.xls`,
+  comma/semicolon/tab-delimited. Fuzzy column matching; metadata rows above the header are skipped.
+
+- **Converts correctly** — the parts the old version got wrong:
+  - **Localises time.** SleepON stores `Time` in **UTC** with a separate `Time_Zone` column
+    (e.g. `-05:00`). The converter applies the offset so timestamps are the real local time
+    SleepHQ aligns against — deterministically, regardless of your computer's own timezone.
+  - **Keeps the whole night, across midnight** (the old version silently dropped everything after 00:00).
+  - Robust dates (ISO/`DD-MM`/`MM-DD`/AM-PM/Excel-serial/epoch, auto day-vs-month), range
+    validation, `Validity` filtering, de-duplication to one reading per second.
+  - Emits the exact Wellue/Viatom columns SleepHQ expects, named `YYYYMMDDHHMMSS.csv`.
+
+- **Analyses your night** — computed and charted locally (inline SVG, no dependencies):
+  - Avg / lowest SpO₂, **% of night below 90% / 88%**, **desaturation events** and approximate **ODI**
+  - Pulse average and range
+  - **Hypnogram** and sleep-stage breakdown (from the `Stage` column)
+  - SpO₂-over-night (with 90% threshold + shaded dips), pulse trend, and time-in-band charts
 
 - **Mobile-first UX**
   - Large, non-overlapping tap targets that stack cleanly on phones
-  - Native file picker via a real `<label>` + `<input type="file">` so uploading works reliably on **iOS and Android** (Files, iCloud Drive, Google Drive, Photos)
-  - Drag-and-drop on desktop, “Try it with sample data” for a quick demo
+  - Native picker via a real `<label>` + `<input type="file">` so uploads work reliably on
+    **iOS and Android** (Files, iCloud Drive, Google Drive, Photos); drag-and-drop on desktop
   - Microinteractions and animations throughout, with full `prefers-reduced-motion` support
+  - **Try it with sample data** button, and a **Conversion details** log for troubleshooting
 
----
+## How to use
 
-## 🛠 How to use
-
-1. Open `SleepConverter.html` in any modern browser (or visit your hosted copy).
+1. Open `SleepConverter.html` in any modern browser (or host it anywhere static).
 2. **Add your file** — choose it, drag it in, or tap *Try it with sample data*.
-3. **Convert** — the data is cleaned and reformatted client-side.
-4. **Download** the `YYYYMMDDHHMMSS.csv` file and import it into SleepHQ’s O2 Ring uploader.
+3. **Convert** — cleaned and reformatted client-side; review the stats and charts.
+4. **Download** the `YYYYMMDDHHMMSS.csv` and import it into SleepHQ's O2 Ring uploader.
 
----
+## File formats (quick reference)
 
-## 📁 File format
+**Input — SleepON cloud `RawDataSecond` export** (`.xlsx`):
 
-**Input (SleepON / Go2Sleep):** `.csv` or `.xlsx` containing some variation of
-`Time`/`Date`, `SpO2`/`Oxygen`, `Pulse`/`PR`/`Heart Rate`, and optionally `Motion`
-— or the packed `startTime` + `spo2Raw`/`heartRaw` array layout.
+| Time (UTC) | Time_Zone | Heart_Rate(BPM) | Oxygen(%) | Active | Stage | Validity |
+|---|---|---|---|---|---|---|
+| `2025-10-04T00:59:04.000Z` | `-05:00` | `64` | `96` | `0` | `Wake` | `1` |
 
-**Output (SleepHQ / Wellue O2 Ring CSV):**
+**Output — SleepHQ / Wellue O2 Ring CSV:**
+
 ```csv
 Time,Oxygen Level,Pulse Rate,Motion,O2 Reminder,PR Reminder
-28/03/2025 23:59:56,97,58,0,0,0
-29/03/2025 00:00:00,96,57,0,0,0
-...
+03/10/2025 19:59:04,96,64,0,0,0
+04/10/2025 03:39:59,95,66,0,0,0
 ```
-- Time format: `DD/MM/YYYY HH:mm:ss` (seconds kept, since the ring samples sub-minute)
-- Rows sorted chronologically and de-duplicated
 
----
+Full details, the timezone worked-example, supported variants, and the pipeline
+diagram are in **[docs/DATA_FORMAT.md](docs/DATA_FORMAT.md)**.
 
-## 🧰 Technology
+## Technology
 
 - Vanilla HTML / CSS / JavaScript — no build step, no framework
-- [SheetJS (xlsx)](https://github.com/SheetJS/sheetjs) for Excel parsing (only external dependency, loaded from CDN)
-- Runs 100% client-side
+- [SheetJS (xlsx)](https://github.com/SheetJS/sheetjs) for Excel parsing (the only external dependency, via CDN)
+- Charts are hand-rendered inline SVG — runs 100% client-side and offline
