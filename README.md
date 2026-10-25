@@ -77,3 +77,22 @@ diagram are in **[docs/DATA_FORMAT.md](docs/DATA_FORMAT.md)**.
 - Vanilla HTML / CSS / JavaScript — no build step, no framework
 - [SheetJS (xlsx)](https://github.com/SheetJS/sheetjs) for Excel parsing (the only external dependency, via CDN)
 - Charts are hand-rendered inline SVG — runs 100% client-side and offline
+
+---
+
+## Related
+
+If you track sleep because you have to rather than out of curiosity,
+[WakeState](https://github.com/TaylorONeal/wakestate) is the other half of this: a local,
+narcolepsy-first tracker for wake state, events, medications, and last night's sleep.
+
+## More from me
+
+I'm Taylor O'Neal. I work in product and analytics, teach at Miami University, and put the
+tools I actually use into the open.
+
+- [tayloroneal.com](https://www.tayloroneal.com) for what I'm working on and how to reach me
+- [@businesstaylor](https://x.com/businesstaylor) on X, where I post build notes
+- [@grizzpm](https://www.youtube.com/@grizzpm) on YouTube
+
+If this saved you time, a star helps other people find it. Issues and PRs are welcome.
